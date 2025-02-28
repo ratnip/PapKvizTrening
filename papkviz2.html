@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pap Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1000;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: lightgreen;
+        }
+        .controls button.off {
+            background-color: lightcoral;
+        }
+        #question-list {
+            padding: 20px;
+        }
+        button {
+            font-size: 1.2em;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .question-container button {
+            margin-right: 10px;
+        }
+        .next-question-container {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 10px;
+        }
+        hr {
+            border: 1px solid #ccc;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="sticky-header">
+        <h2>Pap Kviz Trening!</h2>
+        <div class="controls">
+            <span>Set:</span>
+            <button class="toggle on" data-range="1-200">1</button>
+            <button class="toggle on" data-range="201-400">2</button>
+            <button class="toggle on" data-range="401-600">3</button>
+            <button class="toggle on" data-range="601-800">4</button>
+            <button class="toggle on" data-range="801-1000">5</button>
+        </div>
+        <div class="controls">
+            <span>Difficulty:</span>
+            <button class="toggle-diff on" data-difficulty="1">1</button>
+            <button class="toggle-diff on" data-difficulty="2">2</button>
+            <button class="toggle-diff on" data-difficulty="3">3</button>
+            <button class="toggle-diff on" data-difficulty="4">4</button>
+            <button class="toggle-diff on" data-difficulty="5">5</button>
+        </div>
+    </div>
+    <div id="question-list"></div>
+
+    <script>
+        async function loadCSV(file) {
+            const response = await fetch(file);
+            const data = await response.text();
+            return data.split('\n').slice(1)
+                .map(row => row.split(';').map(cell => cell.trim()))
+                .filter(columns => columns.length === 4)
+                .map(([Rbr, Tekst, Odgovor, Tezina]) => ({ Rbr: parseInt(Rbr), Tekst, Odgovor, Tezina: parseInt(Tezina) }));
+        }
+
+        function getRandomQuestion(questions, selectedRanges, selectedDifficulties, playedQuestions) {
+            const filteredQuestions = questions.filter(q => 
+                selectedRanges.some(([min, max]) => q.Rbr >= min && q.Rbr <= max) &&
+                selectedDifficulties.includes(q.Tezina) &&
+                !playedQuestions.has(q.Tekst)
+            );
+            if (filteredQuestions.length === 0) return null;
+            const randomQuestion = filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
+            playedQuestions.add(randomQuestion.Tekst);
+            return randomQuestion;
+        }
+		
+		function renderQuestion(question, container) {
+            const questionDiv = document.createElement('div');
+            questionDiv.classList.add('question-container');
+
+            const title = document.createElement('h3');
+            title.textContent = `${question.Tekst}`;
+            questionDiv.appendChild(title);
+
+            const revealAnswerButton = document.createElement('button');
+            revealAnswerButton.textContent = "Pokaži odgovor";
+            revealAnswerButton.onclick = () => {
+                const answer = document.createElement('p');
+                answer.textContent = `Odgovor: ${question.Odgovor}`;
+                questionDiv.appendChild(answer);
+                revealAnswerButton.disabled = true;
+                autoScrollToBottom();
+            };
+            questionDiv.appendChild(revealAnswerButton);
+            
+            const revealNumberButton = document.createElement('button');
+            revealNumberButton.textContent = "Broj pitanja";
+            revealNumberButton.onclick = () => {
+                const number = document.createElement('p');
+                number.textContent = `Broj pitanja: ${question.Rbr}`;
+                questionDiv.appendChild(number);
+                revealNumberButton.disabled = true;
+                autoScrollToBottom();
+            };
+            questionDiv.appendChild(revealNumberButton);
+
+            container.appendChild(questionDiv);
+            container.appendChild(document.createElement('hr'));
+        }
+
+        function autoScrollToBottom() {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+			const questions = await loadCSV('pubquiz2.csv');
+			console.log("Loaded questions:", questions); // Debug CSV load
+
+			const questionList = document.getElementById('question-list');
+			const toggleButtons = document.querySelectorAll('.toggle');
+			const toggleDiffButtons = document.querySelectorAll('.toggle-diff');
+
+			let selectedRanges = [[1, 200], [201, 400], [401, 600], [601, 800], [801, 1000]];
+			let selectedDifficulties = [1, 2, 3, 4, 5];
+			let playedQuestions = new Set();
+
+			function loadNextQuestion() {
+				let question = getRandomQuestion(questions, selectedRanges, selectedDifficulties, playedQuestions);
+				console.log("Selected question:", question); // Debug selected question
+
+				if (!question) {
+					questionList.innerHTML = "<p>Nema više dostupnih pitanja.</p>";
+				return;
+				}
+				renderQuestion(question, questionList);
+				const nextQuestionButtonContainer = document.createElement('div');
+                nextQuestionButtonContainer.classList.add('next-question-container');
+                const nextQuestionButton = document.createElement('button');
+                nextQuestionButton.textContent = "Dalje";
+                nextQuestionButton.onclick = loadNextQuestion;
+                nextQuestionButtonContainer.appendChild(nextQuestionButton);
+                questionList.appendChild(nextQuestionButtonContainer);
+                autoScrollToBottom();
+			}
+
+			toggleButtons.forEach(button => {
+				button.addEventListener('click', () => {
+					const [min, max] = button.getAttribute('data-range').split('-').map(Number);
+					const rangeIndex = selectedRanges.findIndex(([rMin, rMax]) => rMin === min && rMax === max);
+					if (rangeIndex > -1) {
+						selectedRanges.splice(rangeIndex, 1);
+						button.classList.add('off');
+					} else {
+						selectedRanges.push([min, max]);
+						button.classList.remove('off');
+					}
+					console.log("Updated selectedRanges:", selectedRanges); // Debug range selection
+				});
+			});
+
+			toggleDiffButtons.forEach(button => {
+				button.addEventListener('click', () => {
+					const difficulty = parseInt(button.getAttribute('data-difficulty'));
+					if (selectedDifficulties.includes(difficulty)) {
+						selectedDifficulties = selectedDifficulties.filter(d => d !== difficulty);
+						button.classList.add('off');
+					} else {
+						selectedDifficulties.push(difficulty);
+						button.classList.remove('off');
+					}
+					console.log("Updated selectedDifficulties:", selectedDifficulties); // Debug difficulty selection
+				});
+			});
+
+		loadNextQuestion(); // Try loading first question immediately
+	});
+
+    </script>
+</body>
+</html>

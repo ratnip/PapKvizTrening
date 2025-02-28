@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Duper Kviz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #f8f8f8;
+            padding: 10px;
+            border-bottom: 2px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        header .score {
+			font-size: 1.2em;
+			white-space: nowrap; /* Prevents breaking the score into multiple lines */
+			overflow: hidden;    /* Ensures content stays within bounds */
+			text-align: right;   /* Aligns text to the right */
+			padding-right: 10px; /* Adds space between the text and the edge */
+		}
+
+        main {
+            margin-top: 80px;
+            padding: 20px;
+        }
+
+        .question {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .question h2 {
+            margin-bottom: 15px;
+        }
+
+        .choices {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .choices button {
+            flex: 1 1 48%;
+            padding: 10px;
+            font-size: 1em;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .choices button:hover {
+            background-color: #f1f1f1;
+        }
+
+        .choices button.correct {
+            background-color: #28a745;
+            color: #fff;
+            border-color: #28a745;
+        }
+
+        .choices button.incorrect {
+            background-color: #dc3545;
+            color: #fff;
+            border-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Super Duper Kviz</h1>
+    <div class="score">Score: <span id="score">0</span>/<span id="total">0</span></div>
+</header>
+
+<main id="quiz"></main>
+
+<script>
+    let quizData = [];
+    let score = 0;
+    let totalQuestions = -1;
+
+    const scoreElement = document.getElementById('score');
+    const totalElement = document.getElementById('total');
+    const quizContainer = document.getElementById('quiz');
+
+    // Helper function to get a random item from an array
+    function getRandomElement(array) {
+        return array[Math.floor(Math.random() * array.length)];
+    }
+
+    // Helper function to get random unique wrong answers
+    function getRandomUniqueChoices(correctArtist, decade) {
+        const sameDecadeArtists = quizData
+            .filter(q => q.Decade === decade && q.songArtist !== correctArtist)
+            .map(q => q.songArtist);
+        const randomChoices = new Set();
+        while (randomChoices.size < 3 && randomChoices.size < sameDecadeArtists.length) {
+            randomChoices.add(getRandomElement(sameDecadeArtists));
+        }
+        return [...randomChoices];
+    }
+
+    // Function to create a new quiz question
+    function createQuestion() {
+        const unanswered = quizData.filter(q => !q.asked);
+        if (unanswered.length === 0) {
+            quizContainer.innerHTML += '<p>No more questions!</p>';
+            return;
+        }
+
+        const question = getRandomElement(unanswered);
+        question.asked = true; // Mark the question as asked
+        totalQuestions++;
+
+        // Update total display immediately
+        totalElement.textContent = totalQuestions;
+
+        const choices = getRandomUniqueChoices(question.songArtist, question.Decade);
+        choices.push(question.songArtist);
+        choices.sort(() => Math.random() - 0.5);
+
+        const questionElement = document.createElement('div');
+        questionElement.classList.add('question');
+
+        questionElement.innerHTML = `
+            <h2>Who sings "${question.songTitle}"?</h2>
+            <div class="choices">
+                ${choices.map(choice => `<button>${choice}</button>`).join('')}
+            </div>
+        `;
+
+        const buttons = questionElement.querySelectorAll('button');
+        buttons.forEach(button => {
+            button.addEventListener('click', () => {
+                if (button.textContent === question.songArtist) {
+                    score++;
+                    button.classList.add('correct');
+                } else {
+                    button.classList.add('incorrect');
+                    buttons.forEach(btn => {
+                        if (btn.textContent === question.songArtist) {
+                            btn.classList.add('correct');
+                        }
+                    });
+                }
+
+                // Update score display
+                scoreElement.textContent = score;
+
+                setTimeout(() => {
+                    questionElement.remove();
+                    createQuestion();
+                    window.scrollTo(0, document.body.scrollHeight);
+                }, 1000);
+            });
+        });
+
+        quizContainer.appendChild(questionElement);
+    }
+
+    // Load CSV data
+    async function loadCSV() {
+        try {
+            const response = await fetch('music.csv');
+            const text = await response.text();
+            const rows = text.trim().split('\n').slice(1); // Skip header row
+            quizData = rows.map(row => {
+                const [songTitle, songArtist, Decade] = row.split(',');
+                return { songTitle, songArtist, Decade, asked: false };
+            });
+
+            // Initialize total display with 0
+            totalElement.textContent = totalQuestions;
+
+            // Start the quiz
+            createQuestion();
+        } catch (error) {
+            console.error('Error loading CSV:', error);
+            quizContainer.innerHTML = '<p>Error loading quiz data.</p>';
+        }
+    }
+
+    // Start loading the CSV
+    loadCSV();
+</script>
+
+</body>
+</html>
