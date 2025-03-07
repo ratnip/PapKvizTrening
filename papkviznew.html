@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pap Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1000;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: lightgreen;
+        }
+        .controls button.off {
+            background-color: lightcoral;
+        }
+        #question-list {
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sticky-header">
+        <h2>Pap Kviz Trening!</h2>
+        <div class="controls">
+            <span>Set:</span>
+            <button class="toggle on" data-range="1-200">1</button>
+            <button class="toggle on" data-range="201-400">2</button>
+            <button class="toggle on" data-range="401-600">3</button>
+            <button class="toggle on" data-range="601-800">4</button>
+            <button class="toggle on" data-range="801-1000">5</button>
+        </div>
+    </div>
+    <div id="question-list"></div>
+
+    <script>
+        let questionCount = 0;
+
+        async function loadCSV(file) {
+            const response = await fetch(file);
+            const data = await response.text();
+            return data.split('\n').slice(1)
+                .map(row => row.split(';').map(cell => cell.trim()))
+                .filter(columns => columns.length === 4)
+                .map(([Rbr, Tekst, Odgovor, Tezina]) => ({ Rbr: parseInt(Rbr), Tekst, Odgovor, Tezina: parseInt(Tezina) }));
+        }
+
+        function getRandomQuestion(questions, selectedRanges, playedQuestions) {
+            const filteredQuestions = questions.filter(q => 
+                selectedRanges.some(([min, max]) => q.Rbr >= min && q.Rbr <= max) &&
+                !playedQuestions.has(q.Tekst)
+            );
+            if (filteredQuestions.length === 0) return null;
+            const randomQuestion = filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
+            playedQuestions.add(randomQuestion.Tekst);
+            return randomQuestion;
+        }
+
+        function renderQuestion(question, container) {
+            questionCount++;
+            const questionDiv = document.createElement('div');
+            questionDiv.classList.add('question-container');
+
+            const title = document.createElement('h3');
+            title.textContent = `${questionCount}. ${question.Tekst}`;
+            questionDiv.appendChild(title);
+
+            const revealAnswerButton = document.createElement('button');
+            revealAnswerButton.textContent = "Pokaži odgovor";
+            revealAnswerButton.onclick = () => {
+                const answer = document.createElement('p');
+                answer.textContent = `Odgovor: ${question.Odgovor}`;
+                questionDiv.appendChild(answer);
+                revealAnswerButton.disabled = true;
+            };
+            questionDiv.appendChild(revealAnswerButton);
+
+            container.appendChild(questionDiv);
+            container.appendChild(document.createElement('hr'));
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const questions = await loadCSV('pubquiz2.csv');
+            const questionList = document.getElementById('question-list');
+            const toggleButtons = document.querySelectorAll('.toggle');
+            let selectedRanges = [[1, 200], [201, 400], [401, 600], [601, 800], [801, 1000]];
+            let playedQuestions = new Set();
+
+            function loadNextQuestion() {
+                let question = getRandomQuestion(questions, selectedRanges, playedQuestions);
+                if (!question) {
+                    questionList.innerHTML = "<p>Nema više dostupnih pitanja.</p>";
+                    return;
+                }
+                renderQuestion(question, questionList);
+                
+                const nextQuestionButton = document.createElement('button');
+                nextQuestionButton.textContent = "Dalje";
+                nextQuestionButton.onclick = loadNextQuestion;
+                questionList.appendChild(nextQuestionButton);
+            }
+
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const [min, max] = button.getAttribute('data-range').split('-').map(Number);
+                    const rangeIndex = selectedRanges.findIndex(([rMin, rMax]) => rMin === min && rMax === max);
+                    if (rangeIndex > -1) {
+                        selectedRanges.splice(rangeIndex, 1);
+                        button.classList.add('off');
+                    } else {
+                        selectedRanges.push([min, max]);
+                        button.classList.remove('off');
+                    }
+                });
+            });
+
+            loadNextQuestion();
+        });
+    </script>
+</body>
+</html>
