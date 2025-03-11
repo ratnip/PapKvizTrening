@@ -38,7 +38,7 @@
         #question-list {
             padding: 20px;
         }
-        button {
+		button {
             font-size: 1.2em;
             padding: 10px 15px;
             margin: 5px 0;
@@ -74,16 +74,19 @@
     <div class="sticky-header">
         <h2>Pap Kviz Trening!</h2>
         <div class="controls">
+            <span>Set:</span>
             <button class="toggle on" data-range="1-200">1</button>
             <button class="toggle on" data-range="201-400">2</button>
             <button class="toggle on" data-range="401-600">3</button>
-			<button class="toggle on" data-range="601-800">4</button>
-			<button class="toggle on" data-range="801-1000">5</button>
+            <button class="toggle on" data-range="601-800">4</button>
+            <button class="toggle on" data-range="801-1000">5</button>
         </div>
     </div>
     <div id="question-list"></div>
 
     <script>
+        let questionCount = 0;
+
         async function loadCSV(file) {
             const response = await fetch(file);
             const data = await response.text();
@@ -105,11 +108,12 @@
         }
 
         function renderQuestion(question, container) {
+            questionCount++;
             const questionDiv = document.createElement('div');
             questionDiv.classList.add('question-container');
 
             const title = document.createElement('h3');
-            title.textContent = `${question.Tekst}`;
+            title.textContent = `${questionCount}. ${question.Tekst}`;
             questionDiv.appendChild(title);
 
             const revealAnswerButton = document.createElement('button');
@@ -119,11 +123,10 @@
                 answer.textContent = `Odgovor: ${question.Odgovor}`;
                 questionDiv.appendChild(answer);
                 revealAnswerButton.disabled = true;
-                autoScrollToBottom();
             };
             questionDiv.appendChild(revealAnswerButton);
-            
-            const revealNumberButton = document.createElement('button');
+			
+			const revealNumberButton = document.createElement('button');
             revealNumberButton.textContent = "Broj pitanja";
             revealNumberButton.onclick = () => {
                 const number = document.createElement('p');
@@ -137,8 +140,8 @@
             container.appendChild(questionDiv);
             container.appendChild(document.createElement('hr'));
         }
-
-        function autoScrollToBottom() {
+		
+		function autoScrollToBottom() {
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         }
 
@@ -146,7 +149,7 @@
             const questions = await loadCSV('pubquiz2.csv');
             const questionList = document.getElementById('question-list');
             const toggleButtons = document.querySelectorAll('.toggle');
-            let selectedRanges = [[1, 200], [201, 400], [401, 600],[601, 800], [901, 1000]];
+            let selectedRanges = [[1, 200], [201, 400], [401, 600],[601, 800], [801, 1000]];
             let playedQuestions = new Set();
 
             toggleButtons.forEach(button => {
@@ -164,6 +167,7 @@
                     }
                 });
             });
+
 
             function loadNextQuestion() {
                 let question = getRandomQuestion(questions, selectedRanges, playedQuestions);
