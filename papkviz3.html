@@ -81,6 +81,7 @@
             <button class="toggle on" data-range="601-800">4</button>
             <button class="toggle on" data-range="801-1000">5</button>
             <button id="diff-button" style="background-color: orange;">diff</button>
+            <button id="store-button">store</button>
         </div>
     </div>
     <div id="question-list"></div>
@@ -196,8 +197,16 @@
 
         document.getElementById('diff-button').addEventListener('click', () => {
             if (!lastShownQuestion) return;
-
             difficultQuestions.push(lastShownQuestion);
+            alert('Question added to difficult cache!');
+        });
+
+        document.getElementById('store-button').addEventListener('click', () => {
+            if (difficultQuestions.length === 0) {
+                alert('No difficult questions to store.');
+                return;
+            }
+
             const csvContent = "Rbr;Tekst;Odgovor;Tezina\n" + difficultQuestions.map(q =>
                 `${q.Rbr};${q.Tekst};${q.Odgovor};${q.Tezina}`
             ).join("\n");
