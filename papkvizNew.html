@@ -38,7 +38,7 @@
         #question-list {
             padding: 20px;
         }
-        button {
+		button {
             font-size: 1.2em;
             padding: 10px 15px;
             margin: 5px 0;
@@ -75,24 +75,17 @@
         <h2>Pap Kviz Trening!</h2>
         <div class="controls">
             <span>Set:</span>
-            <button class="toggle on" data-range="1-200">1</button>
-            <button class="toggle on" data-range="201-400">2</button>
-            <button class="toggle on" data-range="401-600">3</button>
-            <button class="toggle on" data-range="601-800">4</button>
-            <button class="toggle on" data-range="801-1000">5</button>
-        </div>
-        <div class="controls">
-            <span>Difficulty:</span>
-            <button class="toggle-diff on" data-difficulty="1">1</button>
-            <button class="toggle-diff on" data-difficulty="2">2</button>
-            <button class="toggle-diff on" data-difficulty="3">3</button>
-            <button class="toggle-diff on" data-difficulty="4">4</button>
-            <button class="toggle-diff on" data-difficulty="5">5</button>
+            <button class="toggle on" data-range="1-400">1</button>
+            <button class="toggle on" data-range="401-800">2</button>
+			<button class="toggle on" data-range="801-1200">3</button>
+            <button class="toggle on" data-range="1201-1600">4</button>
         </div>
     </div>
     <div id="question-list"></div>
 
     <script>
+        let questionCount = 0;
+
         async function loadCSV(file) {
             const response = await fetch(file);
             const data = await response.text();
@@ -102,10 +95,9 @@
                 .map(([Rbr, Tekst, Odgovor, Tezina]) => ({ Rbr: parseInt(Rbr), Tekst, Odgovor, Tezina: parseInt(Tezina) }));
         }
 
-        function getRandomQuestion(questions, selectedRanges, selectedDifficulties, playedQuestions) {
+        function getRandomQuestion(questions, selectedRanges, playedQuestions) {
             const filteredQuestions = questions.filter(q => 
                 selectedRanges.some(([min, max]) => q.Rbr >= min && q.Rbr <= max) &&
-                selectedDifficulties.includes(q.Tezina) &&
                 !playedQuestions.has(q.Tekst)
             );
             if (filteredQuestions.length === 0) return null;
@@ -113,13 +105,14 @@
             playedQuestions.add(randomQuestion.Tekst);
             return randomQuestion;
         }
-		
-		function renderQuestion(question, container) {
+
+        function renderQuestion(question, container) {
+            questionCount++;
             const questionDiv = document.createElement('div');
             questionDiv.classList.add('question-container');
 
             const title = document.createElement('h3');
-            title.textContent = `${question.Tekst}`;
+            title.textContent = `${questionCount}. ${question.Tekst}`;
             questionDiv.appendChild(title);
 
             const revealAnswerButton = document.createElement('button');
@@ -129,11 +122,10 @@
                 answer.textContent = `Odgovor: ${question.Odgovor}`;
                 questionDiv.appendChild(answer);
                 revealAnswerButton.disabled = true;
-                autoScrollToBottom();
             };
             questionDiv.appendChild(revealAnswerButton);
-            
-            const revealNumberButton = document.createElement('button');
+			
+			const revealNumberButton = document.createElement('button');
             revealNumberButton.textContent = "Broj pitanja";
             revealNumberButton.onclick = () => {
                 const number = document.createElement('p');
@@ -147,33 +139,45 @@
             container.appendChild(questionDiv);
             container.appendChild(document.createElement('hr'));
         }
-
-        function autoScrollToBottom() {
+		
+		function autoScrollToBottom() {
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-			const questions = await loadCSV('pubquiz2.csv');
-			console.log("Loaded questions:", questions); // Debug CSV load
+            const questions = await loadCSV('pubquiz.csv');
+            const questionList = document.getElementById('question-list');
+            const toggleButtons = document.querySelectorAll('.toggle');
+            let selectedRanges = [[1, 400], [401, 800], [801, 1200], [1201, 1600]];
+            let playedQuestions = new Set();
 
-			const questionList = document.getElementById('question-list');
-			const toggleButtons = document.querySelectorAll('.toggle');
-			const toggleDiffButtons = document.querySelectorAll('.toggle-diff');
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const [min, max] = button.getAttribute('data-range').split('-').map(Number);
+                    const rangeIndex = selectedRanges.findIndex(([rMin, rMax]) => rMin === min && rMax === max);
+                    if (rangeIndex > -1) {
+                        selectedRanges.splice(rangeIndex, 1);
+                        button.classList.remove('on');
+                        button.classList.add('off');
+                    } else {
+                        selectedRanges.push([min, max]);
+                        button.classList.remove('off');
+                        button.classList.add('on');
+                    }
+                });
+            });
 
-			let selectedRanges = [[1, 200], [201, 400], [401, 600], [601, 800], [801, 1000]];
-			let selectedDifficulties = [1, 2, 3, 4, 5];
-			let playedQuestions = new Set();
 
-			function loadNextQuestion() {
-				let question = getRandomQuestion(questions, selectedRanges, selectedDifficulties, playedQuestions);
-				console.log("Selected question:", question); // Debug selected question
-
-				if (!question) {
-					questionList.innerHTML = "<p>Nema više dostupnih pitanja.</p>";
-				return;
-				}
-				renderQuestion(question, questionList);
-				const nextQuestionButtonContainer = document.createElement('div');
+            function loadNextQuestion() {
+                let question = getRandomQuestion(questions, selectedRanges, playedQuestions);
+                if (!question) {
+                    const warning = document.createElement('p');
+                    warning.textContent = "Nema više pitanja u odabranim rasponima.";
+                    questionList.appendChild(warning);
+                    return;
+                }
+                renderQuestion(question, questionList);
+                const nextQuestionButtonContainer = document.createElement('div');
                 nextQuestionButtonContainer.classList.add('next-question-container');
                 const nextQuestionButton = document.createElement('button');
                 nextQuestionButton.textContent = "Dalje";
@@ -181,40 +185,10 @@
                 nextQuestionButtonContainer.appendChild(nextQuestionButton);
                 questionList.appendChild(nextQuestionButtonContainer);
                 autoScrollToBottom();
-			}
+            }
 
-			toggleButtons.forEach(button => {
-				button.addEventListener('click', () => {
-					const [min, max] = button.getAttribute('data-range').split('-').map(Number);
-					const rangeIndex = selectedRanges.findIndex(([rMin, rMax]) => rMin === min && rMax === max);
-					if (rangeIndex > -1) {
-						selectedRanges.splice(rangeIndex, 1);
-						button.classList.add('off');
-					} else {
-						selectedRanges.push([min, max]);
-						button.classList.remove('off');
-					}
-					console.log("Updated selectedRanges:", selectedRanges); // Debug range selection
-				});
-			});
-
-			toggleDiffButtons.forEach(button => {
-				button.addEventListener('click', () => {
-					const difficulty = parseInt(button.getAttribute('data-difficulty'));
-					if (selectedDifficulties.includes(difficulty)) {
-						selectedDifficulties = selectedDifficulties.filter(d => d !== difficulty);
-						button.classList.add('off');
-					} else {
-						selectedDifficulties.push(difficulty);
-						button.classList.remove('off');
-					}
-					console.log("Updated selectedDifficulties:", selectedDifficulties); // Debug difficulty selection
-				});
-			});
-
-		loadNextQuestion(); // Try loading first question immediately
-	});
-
+            loadNextQuestion();
+        });
     </script>
 </body>
 </html>
