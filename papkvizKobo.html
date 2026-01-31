@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pap Kviz (Kobo)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 12px;
+      background: #000;
+      color: #eee;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+    .meta {
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #333;
+    }
+    .q {
+      margin: 14px 0 6px 0;
+      font-weight: bold;
+    }
+    .a {
+      margin: 0 0 14px 0;
+      padding-left: 10px;
+      color: #ddd;
+    }
+    .sep {
+      border: 0;
+      border-top: 1px solid #222;
+      margin: 10px 0;
+    }
+    .error {
+      color: #ffb3b3;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="meta" id="meta">Učitavam...</div>
+    <div id="list"></div>
+  </div>
+
+  <script>
+  (function () {
+    // --- Config: 5 sets of 400 questions each
+    var SETS = [
+      { n: 1, min: 1,    max: 400  },
+      { n: 2, min: 401,  max: 800  },
+      { n: 3, min: 801,  max: 1200 },
+      { n: 4, min: 1201, max: 1600 },
+      { n: 5, min: 1601, max: 2000 }
+    ];
+
+    // Pick random set 1..5
+    var chosen = SETS[Math.floor(Math.random() * SETS.length)];
+
+    var metaEl = document.getElementById('meta');
+    var listEl = document.getElementById('list');
+
+    metaEl.innerHTML = "Set: " + chosen.n + " (" + chosen.min + "–" + chosen.max + ")";
+
+    // Kobo-friendly shuffle (Fisher–Yates)
+    function shuffle(arr) {
+      for (var i = arr.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+      }
+      return arr;
+    }
+
+    function escapeHtml(s) {
+      // Just in case your CSV has < or & etc.
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function parseCSV(text) {
+      // Your file uses ";" delimiter and 4 columns: Rbr;Tekst;Odgovor;Tezina
+      // This is a simple parser assuming no embedded semicolons/newlines inside fields.
+      var lines = text.split(/\r?\n/);
+      var out = [];
+
+      // skip header line
+      for (var i = 1; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line) continue;
+
+        var cols = line.split(";");
+        if (cols.length < 4) continue;
+
+        var rbr = parseInt((cols[0] || "").trim(), 10);
+        var tekst = (cols[1] || "").trim();
+        var odgovor = (cols[2] || "").trim();
+        // var tezina = parseInt((cols[3] || "").trim(), 10);
+
+        if (!rbr || !tekst) continue;
+
+        out.push({ Rbr: rbr, Tekst: tekst, Odgovor: odgovor });
+      }
+      return out;
+    }
+
+    function renderAll(questions) {
+      if (!questions || questions.length === 0) {
+        listEl.innerHTML = '<div class="error">Nema pitanja za odabrani set.</div>';
+        return;
+      }
+
+      // Build HTML string (faster & simpler for old browsers)
+      var html = "";
+      for (var i = 0; i < questions.length; i++) {
+        var q = questions[i];
+        html += '<div class="q">' + (i + 1) + '. ' + escapeHtml(q.Tekst) + '</div>';
+        html += '<div class="a">Odgovor: ' + escapeHtml(q.Odgovor) + '</div>';
+        html += '<hr class="sep"/>';
+      }
+      listEl.innerHTML = html;
+    }
+
+    function loadCSV_xhr(path, onOk, onErr) {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", path, true);
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200 || xhr.status === 0) {
+              // status 0 can happen with file:// in some browsers
+              onOk(xhr.responseText);
+            } else {
+              onErr("HTTP status: " + xhr.status);
+            }
+          }
+        };
+        xhr.send(null);
+      } catch (e) {
+        onErr(String(e));
+      }
+    }
+
+    // Load CSV from same folder
+    loadCSV_xhr("pubquiz.csv", function (csvText) {
+      var all = parseCSV(csvText);
+
+      // Filter to chosen set range
+      var filtered = [];
+      for (var i = 0; i < all.length; i++) {
+        var r = all[i].Rbr;
+        if (r >= chosen.min && r <= chosen.max) filtered.push(all[i]);
+      }
+
+      // Shuffle and render all
+      shuffle(filtered);
+      metaEl.innerHTML = "Set: " + chosen.n + " (" + chosen.min + "–" + chosen.max + ") · Ukupno: " + filtered.length;
+      renderAll(filtered);
+
+    }, function (err) {
+      listEl.innerHTML =
+        '<div class="error">' +
+        'Ne mogu učitati pubquiz.csv.\\n' +
+        'Provjeri da su papkviz_kobo.html i pubquiz.csv u ISTOJ mapi.\\n' +
+        'Detalji: ' + escapeHtml(err) +
+        '</div>';
+    });
+
+  })();
+  </script>
+</body>
+</html>
