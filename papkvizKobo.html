@@ -3,51 +3,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Pap Kviz (Kobo)</title>
+  <title>Pap Kviz (Kobo Toggle)</title>
   <style>
-    body {
-      margin: 0;
-      padding: 12px;
-      background: #000;
-      color: #eee;
-      font-family: Arial, sans-serif;
-      font-size: 16px;
-      line-height: 1.35;
+    body{
+      margin:0;
+      padding:12px;
+      background:#000;
+      color:#eee;
+      font-family:Arial,sans-serif;
+      font-size:16px;
+      line-height:1.35;
     }
-    .meta {
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #333;
+    .meta{
+      margin-bottom:12px;
+      padding-bottom:10px;
+      border-bottom:1px solid #333;
     }
-    .q {
-      margin: 14px 0 6px 0;
-      font-weight: bold;
+    .item{ margin: 14px 0; }
+    .q{ font-weight:bold; margin:0 0 8px 0; }
+    .btn{
+      display:inline-block;
+      padding:8px 10px;
+      border:1px solid #555;
+      background:#111;
+      color:#eee;
+      border-radius:4px;
+      font-size:15px;
     }
-    .a {
-      margin: 0 0 14px 0;
-      padding-left: 10px;
-      color: #ddd;
+    .btn:active{ background:#222; }
+    .a{
+      margin-top:10px;
+      padding:10px;
+      border-left:3px solid #333;
+      background:#0b0b0b;
+      color:#ddd;
+      display:none; /* hidden by default */
     }
-    .sep {
-      border: 0;
-      border-top: 1px solid #222;
-      margin: 10px 0;
+    hr{
+      border:0;
+      border-top:1px solid #222;
+      margin:12px 0;
     }
-    .error {
-      color: #ffb3b3;
-      white-space: pre-wrap;
-    }
+    .error{ color:#ffb3b3; white-space:pre-wrap; }
   </style>
 </head>
 <body>
-  <div id="app">
-    <div class="meta" id="meta">Učitavam...</div>
-    <div id="list"></div>
-  </div>
+  <div class="meta" id="meta">Učitavam...</div>
+  <div id="list"></div>
 
   <script>
   (function () {
-    // --- Config: 5 sets of 400 questions each
     var SETS = [
       { n: 1, min: 1,    max: 400  },
       { n: 2, min: 401,  max: 800  },
@@ -56,58 +61,59 @@
       { n: 5, min: 1601, max: 2000 }
     ];
 
-    // Pick random set 1..5
     var chosen = SETS[Math.floor(Math.random() * SETS.length)];
-
     var metaEl = document.getElementById('meta');
     var listEl = document.getElementById('list');
 
     metaEl.innerHTML = "Set: " + chosen.n + " (" + chosen.min + "–" + chosen.max + ")";
 
-    // Kobo-friendly shuffle (Fisher–Yates)
     function shuffle(arr) {
       for (var i = arr.length - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
-        var tmp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = tmp;
+        var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
       }
       return arr;
     }
 
-    function escapeHtml(s) {
-      // Just in case your CSV has < or & etc.
+    function esc(s) {
       return String(s)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;");
     }
 
     function parseCSV(text) {
-      // Your file uses ";" delimiter and 4 columns: Rbr;Tekst;Odgovor;Tezina
-      // This is a simple parser assuming no embedded semicolons/newlines inside fields.
       var lines = text.split(/\r?\n/);
       var out = [];
-
-      // skip header line
       for (var i = 1; i < lines.length; i++) {
         var line = lines[i];
         if (!line) continue;
-
         var cols = line.split(";");
         if (cols.length < 4) continue;
 
-        var rbr = parseInt((cols[0] || "").trim(), 10);
-        var tekst = (cols[1] || "").trim();
-        var odgovor = (cols[2] || "").trim();
-        // var tezina = parseInt((cols[3] || "").trim(), 10);
+        var rbr = parseInt((cols[0]||"").trim(), 10);
+        var tekst = (cols[1]||"").trim();
+        var odgovor = (cols[2]||"").trim();
 
         if (!rbr || !tekst) continue;
-
         out.push({ Rbr: rbr, Tekst: tekst, Odgovor: odgovor });
       }
       return out;
     }
+
+    // Kobo-friendly: inline onclick uses this function
+    window.koboToggle = function (id, btn) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (el.style.display === "none" || el.style.display === "") {
+        el.style.display = "block";
+        if (btn) btn.innerHTML = "Sakrij odgovor";
+      } else {
+        el.style.display = "none";
+        if (btn) btn.innerHTML = "Pokaži odgovor";
+      }
+    };
 
     function renderAll(questions) {
       if (!questions || questions.length === 0) {
@@ -115,13 +121,17 @@
         return;
       }
 
-      // Build HTML string (faster & simpler for old browsers)
       var html = "";
       for (var i = 0; i < questions.length; i++) {
         var q = questions[i];
-        html += '<div class="q">' + (i + 1) + '. ' + escapeHtml(q.Tekst) + '</div>';
-        html += '<div class="a">Odgovor: ' + escapeHtml(q.Odgovor) + '</div>';
-        html += '<hr class="sep"/>';
+        var aid = "a_" + i; // unique id per question
+
+        html += '<div class="item">';
+        html +=   '<div class="q">' + (i+1) + '. ' + esc(q.Tekst) + '</div>';
+        html +=   '<button class="btn" onclick="koboToggle(\'' + aid + '\', this)">Pokaži odgovor</button>';
+        html +=   '<div class="a" id="' + aid + '">Odgovor: ' + esc(q.Odgovor) + '</div>';
+        html += '</div>';
+        html += '<hr/>';
       }
       listEl.innerHTML = html;
     }
@@ -132,12 +142,8 @@
         xhr.open("GET", path, true);
         xhr.onreadystatechange = function () {
           if (xhr.readyState === 4) {
-            if (xhr.status === 200 || xhr.status === 0) {
-              // status 0 can happen with file:// in some browsers
-              onOk(xhr.responseText);
-            } else {
-              onErr("HTTP status: " + xhr.status);
-            }
+            if (xhr.status === 200 || xhr.status === 0) onOk(xhr.responseText);
+            else onErr("HTTP status: " + xhr.status);
           }
         };
         xhr.send(null);
@@ -146,31 +152,28 @@
       }
     }
 
-    // Load CSV from same folder
     loadCSV_xhr("pubquiz.csv", function (csvText) {
       var all = parseCSV(csvText);
 
-      // Filter to chosen set range
       var filtered = [];
       for (var i = 0; i < all.length; i++) {
         var r = all[i].Rbr;
         if (r >= chosen.min && r <= chosen.max) filtered.push(all[i]);
       }
 
-      // Shuffle and render all
       shuffle(filtered);
       metaEl.innerHTML = "Set: " + chosen.n + " (" + chosen.min + "–" + chosen.max + ") · Ukupno: " + filtered.length;
+
       renderAll(filtered);
 
     }, function (err) {
       listEl.innerHTML =
         '<div class="error">' +
-        'Ne mogu učitati pubquiz.csv.\\n' +
-        'Provjeri da su papkviz_kobo.html i pubquiz.csv u ISTOJ mapi.\\n' +
-        'Detalji: ' + escapeHtml(err) +
+        'Ne mogu učitati pubquiz.csv.\n' +
+        'Provjeri da su HTML i pubquiz.csv u ISTOJ mapi.\n' +
+        'Detalji: ' + esc(err) +
         '</div>';
     });
-
   })();
   </script>
 </body>
