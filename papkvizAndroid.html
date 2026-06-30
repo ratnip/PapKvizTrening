@@ -276,11 +276,15 @@
             { id: 6, min: 2001, max: 2400 }
         ];
 
+        const STORAGE_KEY = 'papKvizAndroidProgressV1';
+
         let allQuestions = [];
         let activeSet = null;
         let playedQuestions = new Set();
         let questionCount = 0;
         let currentQuestion = null;
+        let answerVisible = false;
+        let numberVisible = false;
 
         const setScreen = document.getElementById('set-screen');
         const quizScreen = document.getElementById('quiz-screen');
@@ -319,6 +323,40 @@
             return allQuestions.filter(q => q.Rbr >= activeSet.min && q.Rbr <= activeSet.max);
         }
 
+        function saveProgress() {
+            if (!activeSet) {
+                localStorage.removeItem(STORAGE_KEY);
+                return;
+            }
+
+            const progressData = {
+                activeSetId: activeSet.id,
+                playedQuestions: Array.from(playedQuestions),
+                questionCount,
+                currentQuestionRbr: currentQuestion ? currentQuestion.Rbr : null,
+                answerVisible,
+                numberVisible,
+                savedAt: Date.now()
+            };
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
+        }
+
+        function loadSavedProgress() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (error) {
+                localStorage.removeItem(STORAGE_KEY);
+                return null;
+            }
+        }
+
+        function clearProgress() {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+
         function getRandomQuestion() {
             const availableQuestions = getQuestionsForActiveSet()
                 .filter(q => !playedQuestions.has(q.Rbr));
@@ -338,6 +376,8 @@
         }
 
         function resetRevealState() {
+            answerVisible = false;
+            numberVisible = false;
             answerBox.textContent = '';
             numberBox.textContent = '';
             answerBox.classList.remove('visible');
@@ -346,36 +386,102 @@
             showNumberButton.disabled = false;
         }
 
+        function applyRevealState() {
+            if (!currentQuestion) return;
+
+            answerBox.textContent = answerVisible ? `Odgovor: ${currentQuestion.Odgovor}` : '';
+            numberBox.textContent = numberVisible ? `Broj pitanja: ${currentQuestion.Rbr}` : '';
+            answerBox.classList.toggle('visible', answerVisible);
+            numberBox.classList.toggle('visible', numberVisible);
+            showAnswerButton.disabled = answerVisible;
+            showNumberButton.disabled = numberVisible;
+        }
+
+        function renderEndOfSet() {
+            const total = getQuestionsForActiveSet().length;
+            currentQuestion = null;
+            answerVisible = false;
+            numberVisible = false;
+            answerBox.textContent = '';
+            numberBox.textContent = '';
+            answerBox.classList.remove('visible');
+            numberBox.classList.remove('visible');
+            questionText.textContent = `Gotovo — završio/la si svih ${total} pitanja u Setu ${activeSet.id}.`;
+            progress.textContent = '';
+            quizStatus.textContent = 'Možeš krenuti ispočetka ili odabrati drugi set.';
+            showAnswerButton.disabled = true;
+            showNumberButton.disabled = true;
+            nextButton.textContent = 'Kreni ispočetka';
+            nextButton.onclick = () => startSet(activeSet, true);
+            saveProgress();
+        }
+
+        function renderCurrentQuestion() {
+            if (!currentQuestion) {
+                renderEndOfSet();
+                return;
+            }
+
+            const total = getQuestionsForActiveSet().length;
+            progress.textContent = `Pitanje ${questionCount} od ${total}`;
+            questionText.textContent = currentQuestion.Tekst;
+            quizStatus.textContent = '';
+            nextButton.textContent = 'Dalje';
+            nextButton.onclick = renderQuestion;
+            applyRevealState();
+            saveProgress();
+        }
+
         function renderQuestion() {
             currentQuestion = getRandomQuestion();
             resetRevealState();
-            quizStatus.textContent = '';
 
             if (!currentQuestion) {
-                questionText.textContent = 'Nema više pitanja u ovom setu.';
-                progress.textContent = '';
-                showAnswerButton.disabled = true;
-                showNumberButton.disabled = true;
-                nextButton.textContent = 'Kreni ispočetka';
-                nextButton.onclick = () => startSet(activeSet);
+                renderEndOfSet();
                 return;
             }
 
             questionCount += 1;
-            const total = getQuestionsForActiveSet().length;
-            progress.textContent = `Pitanje ${questionCount} od ${total}`;
-            questionText.textContent = currentQuestion.Tekst;
-            nextButton.textContent = 'Dalje';
-            nextButton.onclick = renderQuestion;
+            renderCurrentQuestion();
         }
 
-        function startSet(set) {
+        function startSet(set, resetSavedProgress = true) {
             activeSet = set;
             playedQuestions = new Set();
             questionCount = 0;
+            currentQuestion = null;
+            answerVisible = false;
+            numberVisible = false;
             setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
             showScreen('quiz');
+            if (resetSavedProgress) clearProgress();
             renderQuestion();
+        }
+
+        function restoreProgress(saved) {
+            if (!saved || !saved.activeSetId) return false;
+
+            const set = SETS.find(item => item.id === saved.activeSetId);
+            if (!set) return false;
+
+            activeSet = set;
+            playedQuestions = new Set((saved.playedQuestions || []).map(Number));
+            questionCount = Number(saved.questionCount) || 0;
+            currentQuestion = allQuestions.find(q => q.Rbr === Number(saved.currentQuestionRbr)) || null;
+            answerVisible = Boolean(saved.answerVisible);
+            numberVisible = Boolean(saved.numberVisible);
+
+            setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
+            showScreen('quiz');
+
+            if (currentQuestion) {
+                renderCurrentQuestion();
+            } else {
+                renderEndOfSet();
+            }
+
+            quizStatus.textContent = 'Nastavljeno od zadnjeg spremljenog mjesta.';
+            return true;
         }
 
         function renderSetButtons() {
@@ -393,16 +499,16 @@
 
         showAnswerButton.onclick = () => {
             if (!currentQuestion) return;
-            answerBox.textContent = `Odgovor: ${currentQuestion.Odgovor}`;
-            answerBox.classList.add('visible');
-            showAnswerButton.disabled = true;
+            answerVisible = true;
+            applyRevealState();
+            saveProgress();
         };
 
         showNumberButton.onclick = () => {
             if (!currentQuestion) return;
-            numberBox.textContent = `Broj pitanja: ${currentQuestion.Rbr}`;
-            numberBox.classList.add('visible');
-            showNumberButton.disabled = true;
+            numberVisible = true;
+            applyRevealState();
+            saveProgress();
         };
 
         changeSetButton.onclick = () => {
@@ -416,6 +522,12 @@
             try {
                 allQuestions = await loadCSV('pubquiz2.csv');
                 loadStatus.textContent = `Učitano ${allQuestions.length} pitanja.`;
+
+                const saved = loadSavedProgress();
+                if (saved) {
+                    const restored = restoreProgress(saved);
+                    if (!restored) clearProgress();
+                }
             } catch (error) {
                 loadStatus.textContent = error.message || 'Greška pri učitavanju pitanja.';
                 loadStatus.classList.add('error');
