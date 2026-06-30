@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <title>Pap Kviz Android</title>
+    <style>
+        :root {
+            --bg: #000;
+            --card: #121212;
+            --card-2: #1b1b1b;
+            --text: #f2f2f2;
+            --muted: #bdbdbd;
+            --border: #333;
+            --primary: #1565c0;
+            --primary-pressed: #0d47a1;
+            --success: #2e7d32;
+            --danger: #b71c1c;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+        }
+
+        .app {
+            width: 100%;
+            max-width: 620px;
+            min-height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: linear-gradient(#000 78%, rgba(0, 0, 0, 0));
+            padding: 14px 0 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.35rem, 6vw, 2rem);
+            line-height: 1.15;
+            text-align: center;
+        }
+
+        h2 {
+            margin: 0 0 12px;
+            font-size: 1.2rem;
+        }
+
+        p {
+            line-height: 1.45;
+        }
+
+        .screen {
+            display: none;
+            flex: 1;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        }
+
+        .set-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        button {
+            width: 100%;
+            min-height: 52px;
+            padding: 14px 16px;
+            border: 0;
+            border-radius: 14px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            background: var(--primary-pressed);
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #555;
+            color: #aaa;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .set-button {
+            min-height: 72px;
+            background: var(--card-2);
+            border: 1px solid #444;
+        }
+
+        .set-button strong {
+            display: block;
+            font-size: 1.35rem;
+            margin-bottom: 4px;
+        }
+
+        .set-button span {
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-weight: 400;
+        }
+
+        .quiz-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .small-button {
+            width: auto;
+            min-height: 38px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: #333;
+            font-size: 0.9rem;
+        }
+
+        .question-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+        }
+
+        .question-text {
+            margin: 0;
+            font-size: clamp(1.25rem, 6vw, 1.75rem);
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .reveals {
+            display: grid;
+            gap: 10px;
+        }
+
+        .result-box {
+            display: none;
+            margin: 0;
+            padding: 14px;
+            border-radius: 14px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            font-size: 1.08rem;
+            overflow-wrap: anywhere;
+        }
+
+        .result-box.visible {
+            display: block;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .next-button {
+            grid-column: 1 / -1;
+            background: var(--success);
+            min-height: 58px;
+        }
+
+        .status {
+            color: var(--muted);
+            text-align: center;
+            margin: 12px 0 0;
+            min-height: 1.4em;
+        }
+
+        .error {
+            color: #ff8a80;
+        }
+
+        @media (min-width: 520px) {
+            .set-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header>
+            <h1>Pap Kviz Trening!</h1>
+        </header>
+
+        <section id="set-screen" class="screen active">
+            <div class="card">
+                <h2>Odaberi set</h2>
+                <p>Prvo odaberi jedan set pitanja. Nakon toga će se pitanja prikazivati jedno po jedno.</p>
+                <div class="set-grid" id="set-grid"></div>
+                <p id="load-status" class="status">Učitavam pitanja...</p>
+            </div>
+        </section>
+
+        <section id="quiz-screen" class="screen">
+            <div class="quiz-topbar">
+                <button id="change-set" class="small-button" type="button">Promijeni set</button>
+                <span id="set-label"></span>
+            </div>
+
+            <div class="card question-card">
+                <div>
+                    <p id="progress" class="status"></p>
+                    <h2 id="question-text" class="question-text"></h2>
+                </div>
+
+                <div class="reveals">
+                    <p id="answer-box" class="result-box"></p>
+                    <p id="number-box" class="result-box"></p>
+                </div>
+
+                <div class="actions">
+                    <button id="show-answer" type="button">Pokaži odgovor</button>
+                    <button id="show-number" type="button">Broj pitanja</button>
+                    <button id="next-question" class="next-button" type="button">Dalje</button>
+                </div>
+
+                <p id="quiz-status" class="status"></p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const SETS = [
+            { id: 1, min: 1, max: 400 },
+            { id: 2, min: 401, max: 800 },
+            { id: 3, min: 801, max: 1200 },
+            { id: 4, min: 1201, max: 1600 },
+            { id: 5, min: 1601, max: 2000 },
+            { id: 6, min: 2001, max: 2400 }
+        ];
+
+        let allQuestions = [];
+        let activeSet = null;
+        let playedQuestions = new Set();
+        let questionCount = 0;
+        let currentQuestion = null;
+
+        const setScreen = document.getElementById('set-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const setGrid = document.getElementById('set-grid');
+        const loadStatus = document.getElementById('load-status');
+        const setLabel = document.getElementById('set-label');
+        const progress = document.getElementById('progress');
+        const questionText = document.getElementById('question-text');
+        const answerBox = document.getElementById('answer-box');
+        const numberBox = document.getElementById('number-box');
+        const quizStatus = document.getElementById('quiz-status');
+        const showAnswerButton = document.getElementById('show-answer');
+        const showNumberButton = document.getElementById('show-number');
+        const nextButton = document.getElementById('next-question');
+        const changeSetButton = document.getElementById('change-set');
+
+        async function loadCSV(file) {
+            const response = await fetch(file, { cache: 'no-store' });
+            if (!response.ok) throw new Error('CSV datoteka nije pronađena.');
+            const data = await response.text();
+
+            return data.split(/\r?\n/).slice(1)
+                .map(row => row.split(';').map(cell => cell.trim()))
+                .filter(columns => columns.length >= 4 && columns[0])
+                .map(([Rbr, Tekst, Odgovor, Tezina]) => ({
+                    Rbr: parseInt(Rbr, 10),
+                    Tekst,
+                    Odgovor,
+                    Tezina: parseInt(Tezina, 10)
+                }))
+                .filter(q => Number.isFinite(q.Rbr) && q.Tekst);
+        }
+
+        function getQuestionsForActiveSet() {
+            if (!activeSet) return [];
+            return allQuestions.filter(q => q.Rbr >= activeSet.min && q.Rbr <= activeSet.max);
+        }
+
+        function getRandomQuestion() {
+            const availableQuestions = getQuestionsForActiveSet()
+                .filter(q => !playedQuestions.has(q.Rbr));
+
+            if (availableQuestions.length === 0) return null;
+
+            const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+            const question = availableQuestions[randomIndex];
+            playedQuestions.add(question.Rbr);
+            return question;
+        }
+
+        function showScreen(screen) {
+            setScreen.classList.toggle('active', screen === 'set');
+            quizScreen.classList.toggle('active', screen === 'quiz');
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+
+        function resetRevealState() {
+            answerBox.textContent = '';
+            numberBox.textContent = '';
+            answerBox.classList.remove('visible');
+            numberBox.classList.remove('visible');
+            showAnswerButton.disabled = false;
+            showNumberButton.disabled = false;
+        }
+
+        function renderQuestion() {
+            currentQuestion = getRandomQuestion();
+            resetRevealState();
+            quizStatus.textContent = '';
+
+            if (!currentQuestion) {
+                questionText.textContent = 'Nema više pitanja u ovom setu.';
+                progress.textContent = '';
+                showAnswerButton.disabled = true;
+                showNumberButton.disabled = true;
+                nextButton.textContent = 'Kreni ispočetka';
+                nextButton.onclick = () => startSet(activeSet);
+                return;
+            }
+
+            questionCount += 1;
+            const total = getQuestionsForActiveSet().length;
+            progress.textContent = `Pitanje ${questionCount} od ${total}`;
+            questionText.textContent = currentQuestion.Tekst;
+            nextButton.textContent = 'Dalje';
+            nextButton.onclick = renderQuestion;
+        }
+
+        function startSet(set) {
+            activeSet = set;
+            playedQuestions = new Set();
+            questionCount = 0;
+            setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
+            showScreen('quiz');
+            renderQuestion();
+        }
+
+        function renderSetButtons() {
+            setGrid.innerHTML = '';
+
+            SETS.forEach(set => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'set-button';
+                button.innerHTML = `<strong>Set ${set.id}</strong><span>${set.min}-${set.max}</span>`;
+                button.onclick = () => startSet(set);
+                setGrid.appendChild(button);
+            });
+        }
+
+        showAnswerButton.onclick = () => {
+            if (!currentQuestion) return;
+            answerBox.textContent = `Odgovor: ${currentQuestion.Odgovor}`;
+            answerBox.classList.add('visible');
+            showAnswerButton.disabled = true;
+        };
+
+        showNumberButton.onclick = () => {
+            if (!currentQuestion) return;
+            numberBox.textContent = `Broj pitanja: ${currentQuestion.Rbr}`;
+            numberBox.classList.add('visible');
+            showNumberButton.disabled = true;
+        };
+
+        changeSetButton.onclick = () => {
+            showScreen('set');
+            quizStatus.textContent = '';
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            renderSetButtons();
+
+            try {
+                allQuestions = await loadCSV('pubquiz2.csv');
+                loadStatus.textContent = `Učitano ${allQuestions.length} pitanja.`;
+            } catch (error) {
+                loadStatus.textContent = error.message || 'Greška pri učitavanju pitanja.';
+                loadStatus.classList.add('error');
+                setGrid.querySelectorAll('button').forEach(button => button.disabled = true);
+            }
+        });
+    </script>
+</body>
+</html>
