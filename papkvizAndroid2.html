@@ -94,6 +94,32 @@
             margin-top: 14px;
         }
 
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 18px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--card-2);
+            color: var(--text);
+            font-size: 1rem;
+            user-select: none;
+        }
+
+        .option-row input {
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            accent-color: var(--primary);
+        }
+
+        .option-row span {
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
         button {
             width: 100%;
             min-height: 52px;
@@ -163,6 +189,13 @@
             flex-direction: column;
             justify-content: space-between;
             gap: 18px;
+            will-change: transform, opacity;
+            transition: transform 180ms ease, opacity 180ms ease;
+            touch-action: pan-y;
+        }
+
+        .question-card.dragging {
+            transition: none;
         }
 
         .question-text {
@@ -241,6 +274,15 @@
                 <h2>Odaberi set</h2>
                 <p>Prvo odaberi jedan set pitanja. Nakon toga će se pitanja prikazivati jedno po jedno.</p>
                 <div class="set-grid" id="set-grid"></div>
+
+                <label class="option-row" for="animations-toggle">
+                    <input id="animations-toggle" type="checkbox">
+                    <div>
+                        Animacije
+                        <br><span>Uključi vizualni swipe i slide prijelaze.</span>
+                    </div>
+                </label>
+
                 <p id="load-status" class="status">Učitavam pitanja...</p>
             </div>
         </section>
@@ -284,9 +326,12 @@
             { id: 6, min: 2001, max: 2400 }
         ];
 
-        const STORAGE_KEY = 'papKvizAndroidProgressV3';
+        const STORAGE_KEY = 'papKvizAndroidProgressV4';
+        const SETTINGS_KEY = 'papKvizAndroidSettingsV1';
         const SWIPE_MIN_DISTANCE = 70;
         const SWIPE_MAX_VERTICAL_DRIFT = 80;
+        const SWIPE_DRAG_LIMIT = 140;
+        const ANIMATION_MS = 180;
 
         let allQuestions = [];
         let activeSet = null;
@@ -296,17 +341,21 @@
         let currentQuestion = null;
         let answerVisible = false;
         let numberVisible = false;
+        let isAnimating = false;
+        let animationsEnabled = false;
 
         const setScreen = document.getElementById('set-screen');
         const quizScreen = document.getElementById('quiz-screen');
         const setGrid = document.getElementById('set-grid');
         const loadStatus = document.getElementById('load-status');
         const setLabel = document.getElementById('set-label');
+        const animationsToggle = document.getElementById('animations-toggle');
         const progress = document.getElementById('progress');
         const questionText = document.getElementById('question-text');
         const answerBox = document.getElementById('answer-box');
         const numberBox = document.getElementById('number-box');
         const quizStatus = document.getElementById('quiz-status');
+        const questionCard = document.querySelector('.question-card');
         const previousButton = document.getElementById('previous-question');
         const showAnswerButton = document.getElementById('show-answer');
         const showNumberButton = document.getElementById('show-number');
@@ -365,6 +414,24 @@
 
         function clearProgress() {
             localStorage.removeItem(STORAGE_KEY);
+        }
+
+        function loadSettings() {
+            try {
+                const raw = localStorage.getItem(SETTINGS_KEY);
+                if (!raw) return;
+                const settings = JSON.parse(raw);
+                animationsEnabled = Boolean(settings.animationsEnabled);
+                animationsToggle.checked = animationsEnabled;
+            } catch (error) {
+                localStorage.removeItem(SETTINGS_KEY);
+                animationsEnabled = false;
+                animationsToggle.checked = false;
+            }
+        }
+
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({ animationsEnabled }));
         }
 
         function getRandomQuestion() {
@@ -479,7 +546,7 @@
             return true;
         }
 
-        function goNext() {
+        function performNext() {
             if (currentIndex < history.length - 1) {
                 currentIndex += 1;
                 renderCurrentQuestion();
@@ -494,10 +561,73 @@
             renderCurrentQuestion();
         }
 
-        function goPrevious() {
+        function performPrevious() {
             if (currentIndex <= 0) return;
             currentIndex -= 1;
             renderCurrentQuestion();
+        }
+
+        function resetCardPosition() {
+            questionCard.classList.remove('dragging');
+            questionCard.style.transform = '';
+            questionCard.style.opacity = '';
+        }
+
+        function snapCardBack() {
+            if (isAnimating) return;
+            questionCard.classList.remove('dragging');
+            questionCard.style.transform = 'translateX(0)';
+            questionCard.style.opacity = '1';
+            window.setTimeout(resetCardPosition, ANIMATION_MS);
+        }
+
+        function animateNavigation(direction, navigationFn) {
+            if (isAnimating) return;
+
+            if (!animationsEnabled) {
+                resetCardPosition();
+                navigationFn();
+                return;
+            }
+
+            isAnimating = true;
+
+            const exitX = direction === 'next' ? '-105%' : '105%';
+            const enterX = direction === 'next' ? '105%' : '-105%';
+
+            questionCard.classList.remove('dragging');
+            questionCard.style.transform = `translateX(${exitX})`;
+            questionCard.style.opacity = '0';
+
+            window.setTimeout(() => {
+                navigationFn();
+                questionCard.classList.add('dragging');
+                questionCard.style.transform = `translateX(${enterX})`;
+                questionCard.style.opacity = '0';
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        questionCard.classList.remove('dragging');
+                        questionCard.style.transform = 'translateX(0)';
+                        questionCard.style.opacity = '1';
+
+                        window.setTimeout(() => {
+                            resetCardPosition();
+                            isAnimating = false;
+                        }, ANIMATION_MS);
+                    });
+                });
+            }, ANIMATION_MS);
+        }
+
+        function goNext() {
+            if (nextButton.disabled || isAnimating) return;
+            animateNavigation('next', performNext);
+        }
+
+        function goPrevious() {
+            if (previousButton.disabled || isAnimating) return;
+            animateNavigation('previous', performPrevious);
         }
 
         function startSet(set, resetSavedProgress = true) {
@@ -511,7 +641,7 @@
             setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
             showScreen('quiz');
             if (resetSavedProgress) clearProgress();
-            goNext();
+            performNext();
         }
 
         function restoreProgress(saved) {
@@ -544,7 +674,7 @@
             if (history.length > 0 && currentIndex >= 0) {
                 renderCurrentQuestion();
             } else {
-                goNext();
+                performNext();
             }
 
             quizStatus.textContent = 'Nastavljeno od zadnjeg spremljenog mjesta.';
@@ -578,32 +708,70 @@
 
         let touchStartX = 0;
         let touchStartY = 0;
+        let touchCurrentX = 0;
         let touchStartedOnControl = false;
+        let isDraggingCard = false;
 
         function handleTouchStart(event) {
-            if (!isQuizActive() || event.touches.length !== 1) return;
+            if (!isQuizActive() || event.touches.length !== 1 || isAnimating) return;
 
             touchStartedOnControl = isTypingOrButtonTarget(event.target);
             touchStartX = event.touches[0].clientX;
             touchStartY = event.touches[0].clientY;
+            touchCurrentX = touchStartX;
+            isDraggingCard = false;
+        }
+
+        function handleTouchMove(event) {
+            if (!isQuizActive() || touchStartedOnControl || event.touches.length !== 1 || isAnimating) return;
+
+            touchCurrentX = event.touches[0].clientX;
+            const touchCurrentY = event.touches[0].clientY;
+            const deltaX = touchCurrentX - touchStartX;
+            const deltaY = touchCurrentY - touchStartY;
+
+            if (!isDraggingCard) {
+                if (Math.abs(deltaX) < 12) return;
+                if (Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+                isDraggingCard = true;
+                if (animationsEnabled) questionCard.classList.add('dragging');
+            }
+
+            event.preventDefault();
+
+            if (!animationsEnabled) return;
+
+            const limitedDelta = Math.max(-SWIPE_DRAG_LIMIT, Math.min(SWIPE_DRAG_LIMIT, deltaX));
+            const opacity = Math.max(0.65, 1 - Math.abs(limitedDelta) / 360);
+            questionCard.style.transform = `translateX(${limitedDelta}px) rotate(${limitedDelta / 36}deg)`;
+            questionCard.style.opacity = String(opacity);
         }
 
         function handleTouchEnd(event) {
-            if (!isQuizActive() || touchStartedOnControl || event.changedTouches.length !== 1) return;
+            if (!isQuizActive() || touchStartedOnControl || event.changedTouches.length !== 1 || isAnimating) return;
 
             const touchEndX = event.changedTouches[0].clientX;
             const touchEndY = event.changedTouches[0].clientY;
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
 
-            if (Math.abs(deltaX) < SWIPE_MIN_DISTANCE) return;
-            if (Math.abs(deltaY) > SWIPE_MAX_VERTICAL_DRIFT) return;
-            if (Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+            isDraggingCard = false;
+
+            if (Math.abs(deltaX) < SWIPE_MIN_DISTANCE ||
+                Math.abs(deltaY) > SWIPE_MAX_VERTICAL_DRIFT ||
+                Math.abs(deltaX) < Math.abs(deltaY) * 1.25) {
+                if (animationsEnabled) snapCardBack();
+                else resetCardPosition();
+                return;
+            }
 
             if (deltaX > 0 && !previousButton.disabled) {
-                goPrevious();
+                animateNavigation('previous', performPrevious);
             } else if (deltaX < 0 && !nextButton.disabled) {
-                nextButton.click();
+                animateNavigation('next', performNext);
+            } else {
+                if (animationsEnabled) snapCardBack();
+                else resetCardPosition();
             }
         }
 
@@ -623,7 +791,9 @@
         previousButton.onclick = goPrevious;
         document.addEventListener('keydown', handleKeyboardNavigation);
         document.addEventListener('touchstart', handleTouchStart, { passive: true });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
         document.addEventListener('touchend', handleTouchEnd, { passive: true });
+        document.addEventListener('touchcancel', snapCardBack, { passive: true });
 
         showAnswerButton.onclick = () => {
             if (!currentQuestion) return;
@@ -646,7 +816,14 @@
             quizStatus.textContent = '';
         };
 
+        animationsToggle.addEventListener('change', () => {
+            animationsEnabled = animationsToggle.checked;
+            saveSettings();
+            resetCardPosition();
+        });
+
         document.addEventListener('DOMContentLoaded', async () => {
+            loadSettings();
             renderSetButtons();
 
             try {

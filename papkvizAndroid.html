@@ -227,16 +227,26 @@
 
         .actions {
             display: grid;
-            grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: 52px 52px minmax(0, 1fr) minmax(0, 1fr);
             gap: 10px;
             margin-top: 10px;
         }
 
-        .back-button {
+        .back-button,
+        .hard-button {
             width: 52px;
             min-width: 52px;
             padding: 0;
             font-size: 1.35rem;
+        }
+
+        .hard-button {
+            background: #424242;
+        }
+
+        .hard-button.active {
+            background: #f9a825;
+            color: #111;
         }
 
         .next-button {
@@ -283,6 +293,14 @@
                     </div>
                 </label>
 
+                <label class="option-row" for="hard-only-toggle">
+                    <input id="hard-only-toggle" type="checkbox">
+                    <div>
+                        <span id="hard-only-label">Samo teška pitanja (0)</span>
+                        <br><span>Vježbaj samo pitanja koja si označio/la zvjezdicom.</span>
+                    </div>
+                </label>
+
                 <p id="load-status" class="status">Učitavam pitanja...</p>
             </div>
         </section>
@@ -306,6 +324,7 @@
 
                 <div class="actions">
                     <button id="previous-question" class="back-button" type="button" aria-label="Prethodno pitanje">&lt;</button>
+                    <button id="mark-hard" class="hard-button" type="button" aria-label="Označi kao teško">⭐</button>
                     <button id="show-answer" type="button">Pokaži odgovor</button>
                     <button id="show-number" type="button">Broj pitanja</button>
                     <button id="next-question" class="next-button" type="button">Dalje</button>
@@ -327,7 +346,8 @@
         ];
 
         const STORAGE_KEY = 'papKvizAndroidProgressV4';
-        const SETTINGS_KEY = 'papKvizAndroidSettingsV1';
+        const SETTINGS_KEY = 'papKvizAndroidSettingsV2';
+        const HARD_QUESTIONS_KEY = 'papKvizAndroidHardQuestionsV1';
         const SWIPE_MIN_DISTANCE = 70;
         const SWIPE_MAX_VERTICAL_DRIFT = 80;
         const SWIPE_DRAG_LIMIT = 140;
@@ -343,6 +363,8 @@
         let numberVisible = false;
         let isAnimating = false;
         let animationsEnabled = false;
+        let hardOnlyEnabled = false;
+        let hardQuestions = new Set();
 
         const setScreen = document.getElementById('set-screen');
         const quizScreen = document.getElementById('quiz-screen');
@@ -350,6 +372,8 @@
         const loadStatus = document.getElementById('load-status');
         const setLabel = document.getElementById('set-label');
         const animationsToggle = document.getElementById('animations-toggle');
+        const hardOnlyToggle = document.getElementById('hard-only-toggle');
+        const hardOnlyLabel = document.getElementById('hard-only-label');
         const progress = document.getElementById('progress');
         const questionText = document.getElementById('question-text');
         const answerBox = document.getElementById('answer-box');
@@ -357,6 +381,7 @@
         const quizStatus = document.getElementById('quiz-status');
         const questionCard = document.querySelector('.question-card');
         const previousButton = document.getElementById('previous-question');
+        const hardButton = document.getElementById('mark-hard');
         const showAnswerButton = document.getElementById('show-answer');
         const showNumberButton = document.getElementById('show-number');
         const nextButton = document.getElementById('next-question');
@@ -381,7 +406,37 @@
 
         function getQuestionsForActiveSet() {
             if (!activeSet) return [];
-            return allQuestions.filter(q => q.Rbr >= activeSet.min && q.Rbr <= activeSet.max);
+            return allQuestions.filter(q =>
+                q.Rbr >= activeSet.min &&
+                q.Rbr <= activeSet.max &&
+                (!hardOnlyEnabled || hardQuestions.has(q.Rbr))
+            );
+        }
+
+        function getHardCountForSet(set) {
+            if (!set) return hardQuestions.size;
+            return Array.from(hardQuestions).filter(rbr => rbr >= set.min && rbr <= set.max).length;
+        }
+
+        function updateHardOnlyLabel() {
+            const count = activeSet ? getHardCountForSet(activeSet) : hardQuestions.size;
+            hardOnlyLabel.textContent = `Samo teška pitanja (${count})`;
+        }
+
+        function loadHardQuestions() {
+            try {
+                const raw = localStorage.getItem(HARD_QUESTIONS_KEY);
+                if (!raw) return;
+                hardQuestions = new Set(JSON.parse(raw).map(Number).filter(Number.isFinite));
+            } catch (error) {
+                localStorage.removeItem(HARD_QUESTIONS_KEY);
+                hardQuestions = new Set();
+            }
+        }
+
+        function saveHardQuestions() {
+            localStorage.setItem(HARD_QUESTIONS_KEY, JSON.stringify(Array.from(hardQuestions)));
+            updateHardOnlyLabel();
         }
 
         function saveProgress() {
@@ -395,6 +450,7 @@
                 playedQuestions: Array.from(playedQuestions),
                 history,
                 currentIndex,
+                hardOnlyEnabled,
                 savedAt: Date.now()
             };
 
@@ -422,16 +478,20 @@
                 if (!raw) return;
                 const settings = JSON.parse(raw);
                 animationsEnabled = Boolean(settings.animationsEnabled);
+                hardOnlyEnabled = Boolean(settings.hardOnlyEnabled);
                 animationsToggle.checked = animationsEnabled;
+                hardOnlyToggle.checked = hardOnlyEnabled;
             } catch (error) {
                 localStorage.removeItem(SETTINGS_KEY);
                 animationsEnabled = false;
+                hardOnlyEnabled = false;
                 animationsToggle.checked = false;
+                hardOnlyToggle.checked = false;
             }
         }
 
         function saveSettings() {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify({ animationsEnabled }));
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({ animationsEnabled, hardOnlyEnabled }));
         }
 
         function getRandomQuestion() {
@@ -492,6 +552,10 @@
             numberBox.classList.toggle('visible', numberVisible);
             showAnswerButton.disabled = answerVisible;
             showNumberButton.disabled = numberVisible;
+            const isHard = hardQuestions.has(currentQuestion.Rbr);
+            hardButton.classList.toggle('active', isHard);
+            hardButton.setAttribute('aria-pressed', String(isHard));
+            hardButton.title = isHard ? 'Makni oznaku teško' : 'Označi kao teško';
         }
 
         function renderEndOfSet() {
@@ -503,10 +567,17 @@
             numberBox.textContent = '';
             answerBox.classList.remove('visible');
             numberBox.classList.remove('visible');
-            questionText.textContent = `Gotovo — završio/la si svih ${total} pitanja u Setu ${activeSet.id}.`;
+            if (hardOnlyEnabled && total === 0) {
+                questionText.textContent = `Nema teških pitanja u Setu ${activeSet.id}.`;
+                quizStatus.textContent = 'Označi neka pitanja zvjezdicom ili isključi “Samo teška pitanja”.';
+            } else {
+                questionText.textContent = `Gotovo — završio/la si svih ${total} pitanja u Setu ${activeSet.id}.`;
+                quizStatus.textContent = 'Možeš krenuti ispočetka ili odabrati drugi set.';
+            }
             progress.textContent = '';
-            quizStatus.textContent = 'Možeš krenuti ispočetka ili odabrati drugi set.';
             previousButton.disabled = history.length === 0;
+            hardButton.disabled = true;
+            hardButton.classList.remove('active');
             showAnswerButton.disabled = true;
             showNumberButton.disabled = true;
             nextButton.textContent = 'Kreni ispočetka';
@@ -523,10 +594,13 @@
             }
 
             const total = getQuestionsForActiveSet().length;
-            progress.textContent = `Pitanje ${currentIndex + 1} od ${total}`;
+            progress.textContent = hardOnlyEnabled
+                ? `Teško pitanje ${currentIndex + 1} od ${total}`
+                : `Pitanje ${currentIndex + 1} od ${total}`;
             questionText.textContent = currentQuestion.Tekst;
             quizStatus.textContent = '';
             previousButton.disabled = currentIndex <= 0;
+            hardButton.disabled = false;
             nextButton.textContent = 'Dalje';
             nextButton.onclick = goNext;
             applyRevealState();
@@ -638,7 +712,10 @@
             currentQuestion = null;
             answerVisible = false;
             numberVisible = false;
-            setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
+            setLabel.textContent = hardOnlyEnabled
+                ? `Set ${set.id} (${set.min}-${set.max}) · samo teška`
+                : `Set ${set.id} (${set.min}-${set.max})`;
+            updateHardOnlyLabel();
             showScreen('quiz');
             if (resetSavedProgress) clearProgress();
             performNext();
@@ -668,7 +745,10 @@
             if (currentIndex >= history.length) currentIndex = history.length - 1;
             if (currentIndex < -1) currentIndex = -1;
 
-            setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
+            setLabel.textContent = hardOnlyEnabled
+                ? `Set ${set.id} (${set.min}-${set.max}) · samo teška`
+                : `Set ${set.id} (${set.min}-${set.max})`;
+            updateHardOnlyLabel();
             showScreen('quiz');
 
             if (history.length > 0 && currentIndex >= 0) {
@@ -811,6 +891,17 @@
             saveProgress();
         };
 
+        hardButton.onclick = () => {
+            if (!currentQuestion) return;
+            if (hardQuestions.has(currentQuestion.Rbr)) {
+                hardQuestions.delete(currentQuestion.Rbr);
+            } else {
+                hardQuestions.add(currentQuestion.Rbr);
+            }
+            saveHardQuestions();
+            applyRevealState();
+        };
+
         changeSetButton.onclick = () => {
             showScreen('set');
             quizStatus.textContent = '';
@@ -822,8 +913,17 @@
             resetCardPosition();
         });
 
+        hardOnlyToggle.addEventListener('change', () => {
+            hardOnlyEnabled = hardOnlyToggle.checked;
+            saveSettings();
+            clearProgress();
+            updateHardOnlyLabel();
+        });
+
         document.addEventListener('DOMContentLoaded', async () => {
+            loadHardQuestions();
             loadSettings();
+            updateHardOnlyLabel();
             renderSetButtons();
 
             try {
