@@ -163,13 +163,6 @@
             flex-direction: column;
             justify-content: space-between;
             gap: 18px;
-            will-change: transform, opacity;
-            transition: transform 180ms ease, opacity 180ms ease;
-            touch-action: pan-y;
-        }
-
-        .question-card.dragging {
-            transition: none;
         }
 
         .question-text {
@@ -291,11 +284,9 @@
             { id: 6, min: 2001, max: 2400 }
         ];
 
-        const STORAGE_KEY = 'papKvizAndroidProgressV4';
+        const STORAGE_KEY = 'papKvizAndroidProgressV3';
         const SWIPE_MIN_DISTANCE = 70;
         const SWIPE_MAX_VERTICAL_DRIFT = 80;
-        const SWIPE_DRAG_LIMIT = 140;
-        const ANIMATION_MS = 180;
 
         let allQuestions = [];
         let activeSet = null;
@@ -305,7 +296,6 @@
         let currentQuestion = null;
         let answerVisible = false;
         let numberVisible = false;
-        let isAnimating = false;
 
         const setScreen = document.getElementById('set-screen');
         const quizScreen = document.getElementById('quiz-screen');
@@ -317,7 +307,6 @@
         const answerBox = document.getElementById('answer-box');
         const numberBox = document.getElementById('number-box');
         const quizStatus = document.getElementById('quiz-status');
-        const questionCard = document.querySelector('.question-card');
         const previousButton = document.getElementById('previous-question');
         const showAnswerButton = document.getElementById('show-answer');
         const showNumberButton = document.getElementById('show-number');
@@ -490,7 +479,7 @@
             return true;
         }
 
-        function performNext() {
+        function goNext() {
             if (currentIndex < history.length - 1) {
                 currentIndex += 1;
                 renderCurrentQuestion();
@@ -505,66 +494,10 @@
             renderCurrentQuestion();
         }
 
-        function performPrevious() {
+        function goPrevious() {
             if (currentIndex <= 0) return;
             currentIndex -= 1;
             renderCurrentQuestion();
-        }
-
-        function resetCardPosition() {
-            questionCard.classList.remove('dragging');
-            questionCard.style.transform = '';
-            questionCard.style.opacity = '';
-        }
-
-        function snapCardBack() {
-            if (isAnimating) return;
-            questionCard.classList.remove('dragging');
-            questionCard.style.transform = 'translateX(0)';
-            questionCard.style.opacity = '1';
-            window.setTimeout(resetCardPosition, ANIMATION_MS);
-        }
-
-        function animateNavigation(direction, navigationFn) {
-            if (isAnimating) return;
-            isAnimating = true;
-
-            const exitX = direction === 'next' ? '-105%' : '105%';
-            const enterX = direction === 'next' ? '105%' : '-105%';
-
-            questionCard.classList.remove('dragging');
-            questionCard.style.transform = `translateX(${exitX})`;
-            questionCard.style.opacity = '0';
-
-            window.setTimeout(() => {
-                navigationFn();
-                questionCard.classList.add('dragging');
-                questionCard.style.transform = `translateX(${enterX})`;
-                questionCard.style.opacity = '0';
-
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        questionCard.classList.remove('dragging');
-                        questionCard.style.transform = 'translateX(0)';
-                        questionCard.style.opacity = '1';
-
-                        window.setTimeout(() => {
-                            resetCardPosition();
-                            isAnimating = false;
-                        }, ANIMATION_MS);
-                    });
-                });
-            }, ANIMATION_MS);
-        }
-
-        function goNext() {
-            if (nextButton.disabled || isAnimating) return;
-            animateNavigation('next', performNext);
-        }
-
-        function goPrevious() {
-            if (previousButton.disabled || isAnimating) return;
-            animateNavigation('previous', performPrevious);
         }
 
         function startSet(set, resetSavedProgress = true) {
@@ -578,7 +511,7 @@
             setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
             showScreen('quiz');
             if (resetSavedProgress) clearProgress();
-            performNext();
+            goNext();
         }
 
         function restoreProgress(saved) {
@@ -611,7 +544,7 @@
             if (history.length > 0 && currentIndex >= 0) {
                 renderCurrentQuestion();
             } else {
-                performNext();
+                goNext();
             }
 
             quizStatus.textContent = 'Nastavljeno od zadnjeg spremljenog mjesta.';
@@ -645,66 +578,32 @@
 
         let touchStartX = 0;
         let touchStartY = 0;
-        let touchCurrentX = 0;
         let touchStartedOnControl = false;
-        let isDraggingCard = false;
 
         function handleTouchStart(event) {
-            if (!isQuizActive() || event.touches.length !== 1 || isAnimating) return;
+            if (!isQuizActive() || event.touches.length !== 1) return;
 
             touchStartedOnControl = isTypingOrButtonTarget(event.target);
             touchStartX = event.touches[0].clientX;
             touchStartY = event.touches[0].clientY;
-            touchCurrentX = touchStartX;
-            isDraggingCard = false;
-        }
-
-        function handleTouchMove(event) {
-            if (!isQuizActive() || touchStartedOnControl || event.touches.length !== 1 || isAnimating) return;
-
-            touchCurrentX = event.touches[0].clientX;
-            const touchCurrentY = event.touches[0].clientY;
-            const deltaX = touchCurrentX - touchStartX;
-            const deltaY = touchCurrentY - touchStartY;
-
-            if (!isDraggingCard) {
-                if (Math.abs(deltaX) < 12) return;
-                if (Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
-                isDraggingCard = true;
-                questionCard.classList.add('dragging');
-            }
-
-            event.preventDefault();
-
-            const limitedDelta = Math.max(-SWIPE_DRAG_LIMIT, Math.min(SWIPE_DRAG_LIMIT, deltaX));
-            const opacity = Math.max(0.65, 1 - Math.abs(limitedDelta) / 360);
-            questionCard.style.transform = `translateX(${limitedDelta}px) rotate(${limitedDelta / 36}deg)`;
-            questionCard.style.opacity = String(opacity);
         }
 
         function handleTouchEnd(event) {
-            if (!isQuizActive() || touchStartedOnControl || event.changedTouches.length !== 1 || isAnimating) return;
+            if (!isQuizActive() || touchStartedOnControl || event.changedTouches.length !== 1) return;
 
             const touchEndX = event.changedTouches[0].clientX;
             const touchEndY = event.changedTouches[0].clientY;
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
 
-            isDraggingCard = false;
-
-            if (Math.abs(deltaX) < SWIPE_MIN_DISTANCE ||
-                Math.abs(deltaY) > SWIPE_MAX_VERTICAL_DRIFT ||
-                Math.abs(deltaX) < Math.abs(deltaY) * 1.25) {
-                snapCardBack();
-                return;
-            }
+            if (Math.abs(deltaX) < SWIPE_MIN_DISTANCE) return;
+            if (Math.abs(deltaY) > SWIPE_MAX_VERTICAL_DRIFT) return;
+            if (Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
 
             if (deltaX > 0 && !previousButton.disabled) {
-                animateNavigation('previous', performPrevious);
+                goPrevious();
             } else if (deltaX < 0 && !nextButton.disabled) {
-                animateNavigation('next', performNext);
-            } else {
-                snapCardBack();
+                nextButton.click();
             }
         }
 
@@ -724,9 +623,7 @@
         previousButton.onclick = goPrevious;
         document.addEventListener('keydown', handleKeyboardNavigation);
         document.addEventListener('touchstart', handleTouchStart, { passive: true });
-        document.addEventListener('touchmove', handleTouchMove, { passive: false });
         document.addEventListener('touchend', handleTouchEnd, { passive: true });
-        document.addEventListener('touchcancel', snapCardBack, { passive: true });
 
         showAnswerButton.onclick = () => {
             if (!currentQuestion) return;
