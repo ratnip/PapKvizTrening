@@ -265,7 +265,7 @@
                 <div class="actions">
                     <button id="previous-question" class="back-button" type="button" aria-label="Prethodno pitanje">&lt;</button>
                     <button id="show-answer" type="button">Pokaži odgovor</button>
-                    <button id="show-number" type="button">Broj pitanjca</button>
+                    <button id="show-number" type="button">Broj pitanja</button>
                     <button id="next-question" class="next-button" type="button">Dalje</button>
                 </div>
 
@@ -284,7 +284,9 @@
             { id: 6, min: 2001, max: 2400 }
         ];
 
-        const STORAGE_KEY = 'papKvizAndroidProgressV2';
+        const STORAGE_KEY = 'papKvizAndroidProgressV3';
+        const SWIPE_MIN_DISTANCE = 70;
+        const SWIPE_MAX_VERTICAL_DRIFT = 80;
 
         let allQuestions = [];
         let activeSet = null;
@@ -549,6 +551,62 @@
             return true;
         }
 
+
+        function isQuizActive() {
+            return quizScreen.classList.contains('active');
+        }
+
+        function isTypingOrButtonTarget(target) {
+            if (!target) return false;
+            const tagName = target.tagName ? target.tagName.toLowerCase() : '';
+            return ['input', 'textarea', 'select', 'button', 'a'].includes(tagName) || Boolean(target.closest?.('button, a'));
+        }
+
+        function handleKeyboardNavigation(event) {
+            if (!isQuizActive() || isTypingOrButtonTarget(event.target)) return;
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                if (!previousButton.disabled) goPrevious();
+            }
+
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                if (!nextButton.disabled) nextButton.click();
+            }
+        }
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartedOnControl = false;
+
+        function handleTouchStart(event) {
+            if (!isQuizActive() || event.touches.length !== 1) return;
+
+            touchStartedOnControl = isTypingOrButtonTarget(event.target);
+            touchStartX = event.touches[0].clientX;
+            touchStartY = event.touches[0].clientY;
+        }
+
+        function handleTouchEnd(event) {
+            if (!isQuizActive() || touchStartedOnControl || event.changedTouches.length !== 1) return;
+
+            const touchEndX = event.changedTouches[0].clientX;
+            const touchEndY = event.changedTouches[0].clientY;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            if (Math.abs(deltaX) < SWIPE_MIN_DISTANCE) return;
+            if (Math.abs(deltaY) > SWIPE_MAX_VERTICAL_DRIFT) return;
+            if (Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+
+            if (deltaX > 0 && !previousButton.disabled) {
+                goPrevious();
+            } else if (deltaX < 0 && !nextButton.disabled) {
+                nextButton.click();
+            }
+        }
+
         function renderSetButtons() {
             setGrid.innerHTML = '';
 
@@ -563,6 +621,9 @@
         }
 
         previousButton.onclick = goPrevious;
+        document.addEventListener('keydown', handleKeyboardNavigation);
+        document.addEventListener('touchstart', handleTouchStart, { passive: true });
+        document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
         showAnswerButton.onclick = () => {
             if (!currentQuestion) return;
