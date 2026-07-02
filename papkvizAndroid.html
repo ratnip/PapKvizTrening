@@ -194,9 +194,16 @@
 
         .actions {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr);
             gap: 10px;
             margin-top: 10px;
+        }
+
+        .back-button {
+            width: 52px;
+            min-width: 52px;
+            padding: 0;
+            font-size: 1.35rem;
         }
 
         .next-button {
@@ -256,6 +263,7 @@
                 </div>
 
                 <div class="actions">
+                    <button id="previous-question" class="back-button" type="button" aria-label="Prethodno pitanje">&lt;</button>
                     <button id="show-answer" type="button">Pokaži odgovor</button>
                     <button id="show-number" type="button">Broj pitanja</button>
                     <button id="next-question" class="next-button" type="button">Dalje</button>
@@ -276,12 +284,13 @@
             { id: 6, min: 2001, max: 2400 }
         ];
 
-        const STORAGE_KEY = 'papKvizAndroidProgressV1';
+        const STORAGE_KEY = 'papKvizAndroidProgressV2';
 
         let allQuestions = [];
         let activeSet = null;
         let playedQuestions = new Set();
-        let questionCount = 0;
+        let history = [];
+        let currentIndex = -1;
         let currentQuestion = null;
         let answerVisible = false;
         let numberVisible = false;
@@ -296,6 +305,7 @@
         const answerBox = document.getElementById('answer-box');
         const numberBox = document.getElementById('number-box');
         const quizStatus = document.getElementById('quiz-status');
+        const previousButton = document.getElementById('previous-question');
         const showAnswerButton = document.getElementById('show-answer');
         const showNumberButton = document.getElementById('show-number');
         const nextButton = document.getElementById('next-question');
@@ -332,10 +342,8 @@
             const progressData = {
                 activeSetId: activeSet.id,
                 playedQuestions: Array.from(playedQuestions),
-                questionCount,
-                currentQuestionRbr: currentQuestion ? currentQuestion.Rbr : null,
-                answerVisible,
-                numberVisible,
+                history,
+                currentIndex,
                 savedAt: Date.now()
             };
 
@@ -386,6 +394,26 @@
             showNumberButton.disabled = false;
         }
 
+        function syncFromHistoryEntry() {
+            const entry = history[currentIndex];
+            if (!entry) {
+                currentQuestion = null;
+                answerVisible = false;
+                numberVisible = false;
+                return;
+            }
+
+            currentQuestion = allQuestions.find(q => q.Rbr === Number(entry.rbr)) || null;
+            answerVisible = Boolean(entry.answerVisible);
+            numberVisible = Boolean(entry.numberVisible);
+        }
+
+        function syncCurrentEntry() {
+            if (currentIndex < 0 || !history[currentIndex]) return;
+            history[currentIndex].answerVisible = answerVisible;
+            history[currentIndex].numberVisible = numberVisible;
+        }
+
         function applyRevealState() {
             if (!currentQuestion) return;
 
@@ -409,6 +437,7 @@
             questionText.textContent = `Gotovo — završio/la si svih ${total} pitanja u Setu ${activeSet.id}.`;
             progress.textContent = '';
             quizStatus.textContent = 'Možeš krenuti ispočetka ili odabrati drugi set.';
+            previousButton.disabled = history.length === 0;
             showAnswerButton.disabled = true;
             showNumberButton.disabled = true;
             nextButton.textContent = 'Kreni ispočetka';
@@ -417,45 +446,70 @@
         }
 
         function renderCurrentQuestion() {
+            syncFromHistoryEntry();
+
             if (!currentQuestion) {
                 renderEndOfSet();
                 return;
             }
 
             const total = getQuestionsForActiveSet().length;
-            progress.textContent = `Pitanje ${questionCount} od ${total}`;
+            progress.textContent = `Pitanje ${currentIndex + 1} od ${total}`;
             questionText.textContent = currentQuestion.Tekst;
             quizStatus.textContent = '';
+            previousButton.disabled = currentIndex <= 0;
             nextButton.textContent = 'Dalje';
-            nextButton.onclick = renderQuestion;
+            nextButton.onclick = goNext;
             applyRevealState();
             saveProgress();
         }
 
-        function renderQuestion() {
-            currentQuestion = getRandomQuestion();
-            resetRevealState();
+        function appendRandomQuestion() {
+            const question = getRandomQuestion();
+            if (!question) return false;
 
-            if (!currentQuestion) {
+            history.push({
+                rbr: question.Rbr,
+                answerVisible: false,
+                numberVisible: false
+            });
+            currentIndex = history.length - 1;
+            return true;
+        }
+
+        function goNext() {
+            if (currentIndex < history.length - 1) {
+                currentIndex += 1;
+                renderCurrentQuestion();
+                return;
+            }
+
+            if (!appendRandomQuestion()) {
                 renderEndOfSet();
                 return;
             }
 
-            questionCount += 1;
+            renderCurrentQuestion();
+        }
+
+        function goPrevious() {
+            if (currentIndex <= 0) return;
+            currentIndex -= 1;
             renderCurrentQuestion();
         }
 
         function startSet(set, resetSavedProgress = true) {
             activeSet = set;
             playedQuestions = new Set();
-            questionCount = 0;
+            history = [];
+            currentIndex = -1;
             currentQuestion = null;
             answerVisible = false;
             numberVisible = false;
             setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
             showScreen('quiz');
             if (resetSavedProgress) clearProgress();
-            renderQuestion();
+            goNext();
         }
 
         function restoreProgress(saved) {
@@ -465,19 +519,30 @@
             if (!set) return false;
 
             activeSet = set;
-            playedQuestions = new Set((saved.playedQuestions || []).map(Number));
-            questionCount = Number(saved.questionCount) || 0;
-            currentQuestion = allQuestions.find(q => q.Rbr === Number(saved.currentQuestionRbr)) || null;
-            answerVisible = Boolean(saved.answerVisible);
-            numberVisible = Boolean(saved.numberVisible);
+            history = Array.isArray(saved.history) ? saved.history
+                .filter(entry => entry && Number.isFinite(Number(entry.rbr)))
+                .map(entry => ({
+                    rbr: Number(entry.rbr),
+                    answerVisible: Boolean(entry.answerVisible),
+                    numberVisible: Boolean(entry.numberVisible)
+                })) : [];
+
+            playedQuestions = new Set(history.map(entry => entry.rbr));
+            if (Array.isArray(saved.playedQuestions)) {
+                saved.playedQuestions.map(Number).filter(Number.isFinite).forEach(rbr => playedQuestions.add(rbr));
+            }
+
+            currentIndex = Number.isFinite(Number(saved.currentIndex)) ? Number(saved.currentIndex) : history.length - 1;
+            if (currentIndex >= history.length) currentIndex = history.length - 1;
+            if (currentIndex < -1) currentIndex = -1;
 
             setLabel.textContent = `Set ${set.id} (${set.min}-${set.max})`;
             showScreen('quiz');
 
-            if (currentQuestion) {
+            if (history.length > 0 && currentIndex >= 0) {
                 renderCurrentQuestion();
             } else {
-                renderEndOfSet();
+                goNext();
             }
 
             quizStatus.textContent = 'Nastavljeno od zadnjeg spremljenog mjesta.';
@@ -497,9 +562,12 @@
             });
         }
 
+        previousButton.onclick = goPrevious;
+
         showAnswerButton.onclick = () => {
             if (!currentQuestion) return;
             answerVisible = true;
+            syncCurrentEntry();
             applyRevealState();
             saveProgress();
         };
@@ -507,6 +575,7 @@
         showNumberButton.onclick = () => {
             if (!currentQuestion) return;
             numberVisible = true;
+            syncCurrentEntry();
             applyRevealState();
             saveProgress();
         };
