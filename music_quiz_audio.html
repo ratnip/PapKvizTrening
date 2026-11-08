@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Music Quiz · Guess the Artist</title>
+<style>
+        :root {
+            --bg: #000;
+            --card: #121212;
+            --card-2: #1b1b1b;
+            --text: #f2f2f2;
+            --muted: #bdbdbd;
+            --border: #333;
+            --primary: #1565c0;
+            --primary-pressed: #0d47a1;
+            --success: #2e7d32;
+            --danger: #b71c1c;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+        }
+
+        .app {
+            width: 100%;
+            max-width: 620px;
+            min-height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: linear-gradient(#000 78%, rgba(0, 0, 0, 0));
+            padding: 14px 0 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.35rem, 6vw, 2rem);
+            line-height: 1.15;
+            text-align: center;
+        }
+
+        h2 {
+            margin: 0 0 12px;
+            font-size: 1.2rem;
+        }
+
+        p {
+            line-height: 1.45;
+        }
+
+        .screen {
+            display: none;
+            flex: 1;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        }
+
+        .set-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 18px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--card-2);
+            color: var(--text);
+            font-size: 1rem;
+            user-select: none;
+        }
+
+        .option-row input {
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            accent-color: var(--primary);
+        }
+
+        .option-row span {
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        button {
+            width: 100%;
+            min-height: 52px;
+            padding: 14px 16px;
+            border: 0;
+            border-radius: 14px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            background: var(--primary-pressed);
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #555;
+            color: #aaa;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .set-button {
+            min-height: 72px;
+            background: var(--card-2);
+            border: 1px solid #444;
+        }
+
+        .set-button strong {
+            display: block;
+            font-size: 1.35rem;
+            margin-bottom: 4px;
+        }
+
+        .set-button span {
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-weight: 400;
+        }
+
+        .quiz-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .small-button {
+            width: auto;
+            min-height: 38px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: #333;
+            font-size: 0.9rem;
+        }
+
+        .question-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+            will-change: transform, opacity;
+            transition: transform 180ms ease, opacity 180ms ease;
+            touch-action: pan-y;
+        }
+
+        .question-card.dragging {
+            transition: none;
+        }
+
+        .question-text {
+            margin: 0;
+            font-size: clamp(1.25rem, 6vw, 1.75rem);
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .reveals {
+            display: grid;
+            gap: 10px;
+        }
+
+        .result-box {
+            display: none;
+            margin: 0;
+            padding: 14px;
+            border-radius: 14px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            font-size: 1.08rem;
+            overflow-wrap: anywhere;
+        }
+
+        .result-box.visible {
+            display: block;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 52px 52px minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .back-button,
+        .hard-button {
+            width: 52px;
+            min-width: 52px;
+            padding: 0;
+            font-size: 1.35rem;
+        }
+
+        .hard-button {
+            background: #424242;
+        }
+
+        .hard-button.active {
+            background: #f9a825;
+            color: #111;
+        }
+
+        .next-button {
+            grid-column: 1 / -1;
+            background: var(--success);
+            min-height: 58px;
+        }
+
+        .status {
+            color: var(--muted);
+            text-align: center;
+            margin: 12px 0 0;
+            min-height: 1.4em;
+        }
+
+        .error {
+            color: #ff8a80;
+        }
+
+        @media (min-width: 520px) {
+            .set-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+    
+        .screen-intro { color: var(--muted); margin: 0 0 10px; }
+        .decade-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin: 16px 0; }
+        .decade-button { background: var(--card-2); border: 1px solid #444; min-height: 75px; }
+        .decade-button.selected { background: #12375d; border: 2px solid #64b5f6; }
+        .decade-button strong { display: block; font-size: 1.3rem; }
+        .decade-button span { display:block; color:var(--muted); font-size:.84rem; font-weight:400; margin-top:4px; }
+        .all-button { background: #303030; min-height: 48px; }
+        .all-button.selected { background: #12375d; outline:2px solid #64b5f6; outline-offset:-2px; }
+        .start-button { background: var(--success); margin-top: 18px; min-height: 60px; }
+        .song-heading { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .11em; font-size: .85rem; margin: 28px 0 12px; }
+        .song-title { font-size:clamp(1.9rem,8vw,2.7rem); line-height:1.2; font-weight: 750; margin: 0; overflow-wrap:anywhere; }
+        .song-title-row { display:flex; align-items:flex-start; gap:10px; width:100%; }
+        .song-title-row .song-title { flex:1; min-width:0; }
+        .song-decade { flex:0 0 auto; color:var(--muted); font-size:.78rem; font-weight:600; line-height:1.4; padding:5px 7px; margin-top:5px; background:var(--card-2); border:1px solid var(--border); border-radius:8px; white-space:nowrap; }
+        .song-decade[hidden] { display:none; }
+        .answer-highlight { color:#b9ecbc; font-weight:700; }
+        .year-highlight { color: #90caf9; font-weight:700; }
+        .select-summary { color:var(--muted); text-align:center; margin: 12px 0 0; font-size:.92rem; }
+        .selection-title { margin-bottom:5px; }
+        .question-card { min-height: min(67vh, 620px); }
+        .help-text { text-align:center; color:var(--muted); font-size:.8rem; margin:14px 0 0; }
+        @media (min-width:520px) { .decade-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+
+        .audio-panel { background:var(--card-2);border:1px solid var(--border);border-radius:18px;display:flex;align-items:center;flex-direction:column;gap:12px;padding:22px 18px 16px;margin-top:8px;min-height:265px; }
+        .audio-prompt { font-size:1.15rem;letter-spacing:.02em;color:var(--muted);font-weight:500;margin:0; }
+        .mystery-icon { font-size:2.3rem;color:#90caf9;line-height:1; }
+        .audio-play { border-radius:50%;width:86px;height:86px;min-width:86px;min-height:86px;font-size:2.1rem;padding:0;display:grid;place-items:center;background:var(--primary); }
+        .audio-play:disabled { background:#464646; }
+        .audio-timeline { display:flex;gap:9px;align-items:center;width:100%;color:var(--muted);font-size:.78rem;font-variant-numeric:tabular-nums; }
+        .audio-track { flex:1;height:5px;background:#424242;border-radius:999px;overflow:hidden; }
+        .audio-fill { height:100%;background:#90caf9;width:0%;transition:width .15s linear; }
+        .audio-status { font-size:.82rem;color:var(--muted);text-align:center;margin:0;min-height:1.1rem; }
+        .retry-audio { background:#444;margin-top:0;min-height:36px; }
+        .actions { grid-template-columns:52px 52px minmax(0,1fr) minmax(0,1fr); }
+        .actions .decade-action { grid-column:3 / -1;background:#303030; }
+        .actions #next-question { grid-column:1 / -1; }
+        .song-heading { text-align:left; }
+        #clip-player { display:none; }
+</style>
+</head>
+<body>
+<main class="app">
+<header><h1>Music Quiz · Audio</h1></header>
+<section id="set-screen" class="screen active">
+<div class="card">
+<h2 class="selection-title">Choose your decades</h2>
+<p class="screen-intro">Hear a mystery clip and guess both the artist and the song. Choose one or more decades.</p>
+<button id="all-button" class="all-button selected" type="button" aria-pressed="true">All decades</button>
+<div id="decade-grid" class="decade-grid"></div>
+<p id="selection-summary" class="select-summary"></p>
+<label class="option-row" for="animations-toggle"><input id="animations-toggle" type="checkbox"><div>Animations<br><span>Animate swipes and transitions between songs.</span></div></label>
+<label class="option-row" for="auto-decade-toggle"><input id="auto-decade-toggle" type="checkbox"><div>Show decade with song<br><span>Show a small decade hint beside the player.</span></div></label>
+<label class="option-row" for="hard-only-toggle"><input id="hard-only-toggle" type="checkbox"><div><span id="hard-only-label">Hard songs only (0)</span><br><span>Practice songs you marked with the star.</span></div></label>
+<button id="start-button" class="start-button" type="button">Start music quiz</button>
+<p id="load-status" class="status">Internet required for Deezer audio previews. Some tracks may not be available.</p>
+</div>
+</section>
+<section id="quiz-screen" class="screen">
+<div class="quiz-topbar"><button id="change-set" class="small-button" type="button">Change decades</button><span id="set-label"></span></div>
+<div class="card question-card" id="question-card">
+<div><p id="progress" class="status"></p>
+<div class="song-title-row"><p class="song-heading" style="margin:12px 0 8px;flex:1">Name the artist &amp; song</p><span id="song-decade" class="song-decade" hidden></span></div>
+<div class="audio-panel"><div class="mystery-icon" aria-hidden="true">♫</div><h2 id="question-text" class="audio-prompt">Mystery song</h2>
+<button type="button" id="play-audio" class="audio-play" disabled aria-label="Play preview">▶</button>
+<div class="audio-timeline"><span id="audio-time">0:00</span><div class="audio-track"><div id="audio-fill" class="audio-fill"></div></div><span id="audio-duration">0:30</span></div>
+<p id="audio-status" class="audio-status" aria-live="polite">Looking for preview…</p>
+<button type="button" id="retry-audio" class="small-button retry-audio" hidden>Retry search</button>
+</div></div>
+<div class="reveals"><p id="artist-box" class="result-box" aria-live="polite"></p><p id="title-box" class="result-box" aria-live="polite"></p></div>
+<audio id="clip-player" preload="none" playsinline></audio>
+<div class="actions">
+<button id="previous-question" class="back-button" type="button" aria-label="Previous song">&lt;</button>
+<button id="mark-hard" class="hard-button" type="button" aria-label="Mark as hard" aria-pressed="false">⭐</button>
+<button id="show-answer" type="button">Show artist</button>
+<button id="show-title" type="button">Show title</button>
+<button id="show-decade" type="button" class="decade-action">Show decade</button>
+<button id="next-question" class="next-button" type="button">Next song</button>
+</div>
+<p id="quiz-status" class="status"></p>
+</div><p class="help-text">Preview clips from Deezer require internet. Replay as often as you like. Swipe or use arrow keys to navigate.</p>
+</section>
+</main>
+<script>
+// Embedded 628-song collection from music_selected_628.csv; no extra file or server is required.
+const SONGS = [{"id":1,"title":"Sitting on the Dock of the Bay","artist":"Ottis Redding","decade":1960},{"id":2,"title":"Misirlou","artist":"Dick Dale and the Del-tones","decade":1960},{"id":3,"title":"Quando Quando Quando","artist":"Engelbert Humperdinck","decade":1960},{"id":4,"title":"Daydream","artist":"Lovin Spoonful","decade":1960},{"id":5,"title":"Little Green Bag","artist":"George Baker","decade":1960},{"id":6,"title":"Louie Louie","artist":"Kingsmen","decade":1960},{"id":7,"title":"Wonderful World (don't know much about)","artist":"Sam Cooke","decade":1960},{"id":8,"title":"He Ain't Heavy He's My Brother","artist":"The Hollies","decade":1960},{"id":9,"title":"Long Train Runnin","artist":"The Doobie Brothers","decade":1970},{"id":10,"title":"In-a-gadda-da-vida","artist":"Iron Butterfly","decade":1970},{"id":11,"title":"Slowride","artist":"Foghat","decade":1970},{"id":12,"title":"In The Summertime","artist":"Mungo Jerry","decade":1970},{"id":13,"title":"Model","artist":"Kraftwerk","decade":1970},{"id":14,"title":"I'm the Leader of the Gang (Come On Come On)","artist":"Gary Glitter","decade":1970},{"id":15,"title":"Horse with no Name","artist":"America","decade":1970},{"id":16,"title":"Me And Mrs Jones","artist":"Billy Paul","decade":1970},{"id":17,"title":"Kung Fu Fighting","artist":"Carl Douglas","decade":1970},{"id":18,"title":"Sir Duke","artist":"Stevie Wonder","decade":1970},{"id":19,"title":"Pastime Paradise","artist":"Stevie Wonder","decade":1970},{"id":20,"title":"The Hustle","artist":"Van McCoy","decade":1970},{"id":21,"title":"Wild Thing","artist":"The Troggs","decade":1970},{"id":22,"title":"Carry On My Wayward Son","artist":"Kansas","decade":1970},{"id":23,"title":"Oh Carol","artist":"Neil Sedaka","decade":1970},{"id":24,"title":"MacArthur Park","artist":"Richard Harris","decade":1970},{"id":25,"title":"Logical Song","artist":"Supertramp","decade":1970},{"id":26,"title":"Runaway","artist":"Del Shannon","decade":1970},{"id":27,"title":"Rocket Man","artist":"Elton John","decade":1970},{"id":28,"title":"Lady Marmelade","artist":"Labelle","decade":1970},{"id":29,"title":"September","artist":"Earth Wind & Fire","decade":1970},{"id":30,"title":"Ain't No Sunshine","artist":"Bill Withers","decade":1970},{"id":31,"title":"You Make My Feel","artist":"Sylvester","decade":1970},{"id":32,"title":"I Was Made For Loving You","artist":"Kiss","decade":1970},{"id":33,"title":"Play That Funky Music","artist":"Wild Cherry","decade":1970},{"id":34,"title":"YMCA","artist":"Village People","decade":1970},{"id":35,"title":"Mandy","artist":"Barry Mannilow","decade":1970},{"id":36,"title":"Hot Stuff","artist":"Donna Summer","decade":1970},{"id":37,"title":"Walking On Sunshine","artist":"Katrina & The Waves","decade":1970},{"id":38,"title":"Smoke On The Water","artist":"Deep Purple","decade":1970},{"id":39,"title":"Child In Time","artist":"Deep Purple","decade":1970},{"id":40,"title":"Hold the Line","artist":"Toto","decade":1970},{"id":41,"title":"When I Need You","artist":"Leo Sayer","decade":1970},{"id":42,"title":"Cold As Ice","artist":"Foreigner","decade":1970},{"id":43,"title":"Le Freak","artist":"Chic","decade":1970},{"id":44,"title":"The Boys Are Back In Town","artist":"Thin Lizzy","decade":1970},{"id":45,"title":"Sweet Home Alabama","artist":"Lynyrd Skynyrd","decade":1970},{"id":46,"title":"It's a Heartache","artist":"Bonnie Tyler","decade":1970},{"id":47,"title":"I Will Survive","artist":"Gloria Gaynor","decade":1970},{"id":48,"title":"Go Your Own Way","artist":"Fleetwood Mac","decade":1970},{"id":49,"title":"Living Next Door to Alice","artist":"Smokie","decade":1970},{"id":50,"title":"If You Leave Me Now","artist":"Chicago","decade":1970},{"id":51,"title":"You're the One That I Want","artist":"John Travolta & Olivia Newton-John","decade":1970},{"id":52,"title":"Cats in the Cradle","artist":"Harry Chapin","decade":1970},{"id":53,"title":"All By Myself","artist":"Eric Carmen","decade":1970},{"id":54,"title":"Looking Out My Backdoor","artist":"Creedance Clearwater Revival","decade":1970},{"id":55,"title":"Let's Get It On","artist":"Marvine Gaye","decade":1970},{"id":56,"title":"Ain't No Mountain High Enough","artist":"Diana Ross","decade":1970},{"id":57,"title":"Wonderful Tonight","artist":"Eric Clapton","decade":1970},{"id":58,"title":"Country Roads","artist":"John Denver","decade":1970},{"id":59,"title":"Seasons in the Sun","artist":"Terry Jacks","decade":1970},{"id":60,"title":"Sultans of Swing","artist":"Dire Straits","decade":1970},{"id":61,"title":"Sunshine of Your Love","artist":"Cream","decade":1970},{"id":62,"title":"Por Que Te Vas","artist":"Jeanette","decade":1970},{"id":63,"title":"Che sara","artist":"Ricchi e Poveri","decade":1970},{"id":64,"title":"Sera Perche Ti Amo","artist":"Ricchi e Poveri","decade":1970},{"id":65,"title":"Pedro","artist":"Rafaela Carra","decade":1970},{"id":66,"title":"Stuck in the Middle","artist":"Stealers Wheel","decade":1970},{"id":67,"title":"On the Radio","artist":"Donna Summer","decade":1970},{"id":68,"title":"Disco Iferno (burn baby burn)","artist":"The Trammps","decade":1970},{"id":69,"title":"I've Been Thinking About You","artist":"Londonbeat","decade":1980},{"id":70,"title":"Video Killed The Radio Star","artist":"The Buggles","decade":1980},{"id":71,"title":"Funkytown","artist":"Lipps Inc","decade":1980},{"id":72,"title":"Magic","artist":"Olivia Newton-John","decade":1980},{"id":73,"title":"Xanadu","artist":"Olivia Newton-John","decade":1980},{"id":74,"title":"Physical","artist":"Olivia Newton-John","decade":1980},{"id":75,"title":"Do You Wanna Funk","artist":"Patrick Cowley","decade":1980},{"id":76,"title":"Upside Down","artist":"Diana Ross","decade":1980},{"id":77,"title":"Endless Love","artist":"Diana Ross","decade":1980},{"id":78,"title":"Tide Is High","artist":"Blondie","decade":1980},{"id":79,"title":"Call Me","artist":"Blondie","decade":1980},{"id":80,"title":"Celebration","artist":"Kool & The Gang","decade":1980},{"id":81,"title":"9 to 5 (Morning Train)","artist":"Sheena Austin","decade":1980},{"id":82,"title":"Bette Davis Eyes","artist":"Kim Carnes","decade":1980},{"id":83,"title":"Jessie's Girl","artist":"Rick Springfield","decade":1980},{"id":84,"title":"Don't You Want Me","artist":"Human League","decade":1980},{"id":85,"title":"Waiting for a Girl Like You","artist":"Foreigner","decade":1980},{"id":86,"title":"I Wanna Know What Love Is","artist":"Foreigner","decade":1980},{"id":87,"title":"I Love Rock & Roll","artist":"Joan Jett & The Blackhearts","decade":1980},{"id":88,"title":"Tainted Love","artist":"Soft Cell","decade":1980},{"id":89,"title":"Abracadabra","artist":"Steve Miller Band","decade":1980},{"id":90,"title":"Joker","artist":"Steve Miller Band","decade":1980},{"id":91,"title":"Eye of the Tiger","artist":"Survivor","decade":1980},{"id":92,"title":"Hijo de la Luna","artist":"Mecano","decade":1980},{"id":93,"title":"Come On Eileen","artist":"Dexy's Midnight Runners","decade":1980},{"id":94,"title":"Love is a Shield","artist":"Camouflage","decade":1980},{"id":95,"title":"We Can Dance","artist":"Man Without Hats","decade":1980},{"id":96,"title":"Da Da Da","artist":"Trio","decade":1980},{"id":97,"title":"Who Can It Be Now","artist":"Man At Work","decade":1980},{"id":98,"title":"Land Down Under","artist":"Man At Work","decade":1980},{"id":99,"title":"Maneater","artist":"Daryl Hall & John Oates","decade":1980},{"id":100,"title":"Flashdance","artist":"Irene Cara","decade":1980},{"id":101,"title":"Total Eclipse of the Heart","artist":"Bonnie Tyler","decade":1980},{"id":102,"title":"Karma Chameleon","artist":"Culture Club","decade":1980},{"id":103,"title":"Uptown Girl","artist":"Billy Joel","decade":1980},{"id":104,"title":"Owner of a Lonely Heart","artist":"Yes","decade":1980},{"id":105,"title":"Jump","artist":"Van Halen","decade":1980},{"id":106,"title":"Time After Time","artist":"Cindy Lauper","decade":1980},{"id":107,"title":"Self Control","artist":"Laura Brannigan","decade":1980},{"id":108,"title":"Ghostbusters","artist":"Ray Parker Jr","decade":1980},{"id":109,"title":"Get into my Car","artist":"Billy Ocean","decade":1980},{"id":110,"title":"Carribean Queen","artist":"Billy Ocean","decade":1980},{"id":111,"title":"When the Going Gets Tough","artist":"Billy Ocean","decade":1980},{"id":112,"title":"Everybody Wants to Rule the World","artist":"Tears For Fears","decade":1980},{"id":113,"title":"We Built This City","artist":"Starship","decade":1980},{"id":114,"title":"Kiss","artist":"Prince & The Revolution","decade":1980},{"id":115,"title":"When the Doves Cry","artist":"Prince & The Revolution","decade":1980},{"id":116,"title":"Venus","artist":"Bananarama","decade":1980},{"id":117,"title":"Robert De Niro's Waiting","artist":"Bananarama","decade":1980},{"id":118,"title":"Take My Breath Away","artist":"Berlin","decade":1980},{"id":119,"title":"Stuck With You","artist":"Huey Lewis & The News","decade":1980},{"id":120,"title":"Walk Like an Egyptian","artist":"The Bangles","decade":1980},{"id":121,"title":"Eternal Flame","artist":"The Bangles","decade":1980},{"id":122,"title":"I Just Died In Your Arms Tonight","artist":"Cutting Crew","decade":1980},{"id":123,"title":"Alone","artist":"Heart","decade":1980},{"id":124,"title":"All I Wanna Do Is Make Love to You","artist":"Heart","decade":1980},{"id":125,"title":"Heaven Is a Place on Earth","artist":"Belinda Carlisle","decade":1980},{"id":126,"title":"Never Gonna Give You Up","artist":"Rick Astley","decade":1980},{"id":127,"title":"Together Forever","artist":"Rick Astley","decade":1980},{"id":128,"title":"Don't Worry Be Happy","artist":"Bobby McFerrin","decade":1980},{"id":129,"title":"Every Rose Has Its Torn","artist":"Poison","decade":1980},{"id":130,"title":"Straight Up","artist":"Paula Abdul","decade":1980},{"id":131,"title":"She Drives Me Crazy","artist":"Fine Young Cannibals","decade":1980},{"id":132,"title":"Right Here Waiting","artist":"Richard Marx","decade":1980},{"id":133,"title":"Lambada","artist":"Kaoma","decade":1980},{"id":134,"title":"I'm Gonna Miss You","artist":"Milli Vanilli","decade":1980},{"id":135,"title":"Pump Up the Jam","artist":"Technotronic","decade":1980},{"id":136,"title":"Smalltown Boy","artist":"Bronski Beat","decade":1980},{"id":137,"title":"Relax","artist":"Frankie Goes to Hollywood","decade":1980},{"id":138,"title":"Two Tribes","artist":"Frankie Goes to Hollywood","decade":1980},{"id":139,"title":"Power of Love","artist":"Frankie Goes to Hollywood","decade":1980},{"id":140,"title":"Maniac","artist":"Michael Sembello","decade":1980},{"id":141,"title":"Fast Car","artist":"Tracy Chapman","decade":1980},{"id":142,"title":"Twist in my Sobriety","artist":"Tanita Tikaram","decade":1980},{"id":143,"title":"Dancing With Tears In My Eyes","artist":"Ultravox","decade":1980},{"id":144,"title":"Vienna","artist":"Ultravox","decade":1980},{"id":145,"title":"Don't Go","artist":"Yazoo","decade":1980},{"id":146,"title":"The Riddle (A Tree by the River)","artist":"Nick Kershaw","decade":1980},{"id":147,"title":"Word's Don't Come Easy","artist":"F. R. David","decade":1980},{"id":148,"title":"Big in Japan","artist":"Alphaville","decade":1980},{"id":149,"title":"Kids in America","artist":"Kim Wilde","decade":1980},{"id":150,"title":"Cambodia","artist":"Kim Wilde","decade":1980},{"id":151,"title":"You Came","artist":"Kim Wilde","decade":1980},{"id":152,"title":"Everytime You Go Away","artist":"Paul Young","decade":1980},{"id":153,"title":"Common People","artist":"Paul Young","decade":1980},{"id":154,"title":"Do They Know It's Christmas","artist":"Bob Geldof & Band Aid","decade":1980},{"id":155,"title":"Feels Like Heaven","artist":"Fiction Factory","decade":1980},{"id":156,"title":"Fade to Grey","artist":"Visage","decade":1980},{"id":157,"title":"Camouflage","artist":"Stan Ridgway","decade":1980},{"id":158,"title":"Just an Illusion","artist":"Imagination","decade":1980},{"id":159,"title":"Dr. Beat","artist":"Miami Sound Machine","decade":1980},{"id":160,"title":"Don't Give Up","artist":"Kate Bush & Peter Gabriel","decade":1980},{"id":161,"title":"Running Up That Hill","artist":"Kate Bush","decade":1980},{"id":162,"title":"Addicted to Love","artist":"Robert Palmer","decade":1980},{"id":163,"title":"Stop!","artist":"Sam Brown","decade":1980},{"id":164,"title":"Lion Sleeps Tonight","artist":"Tight Fit","decade":1980},{"id":165,"title":"Beds Are Burning","artist":"Midnight Oil","decade":1980},{"id":166,"title":"Cause I am Your Lady","artist":"Jennifer Rush","decade":1980},{"id":167,"title":"Sealed with a Kiss","artist":"Jason Donovan","decade":1980},{"id":168,"title":"Moi Lolita","artist":"Alizee","decade":1980},{"id":169,"title":"Such a Shame","artist":"Talk Talk Talk","decade":1980},{"id":170,"title":"It's My Life","artist":"Talk Talk Talk","decade":1980},{"id":171,"title":"You Spin Me Around","artist":"Dead Or Alive","decade":1980},{"id":172,"title":"Give it Up","artist":"KC & Sunshine Band","decade":1980},{"id":173,"title":"Turning Japanase","artist":"The Vapors","decade":1980},{"id":174,"title":"It's Raining Men","artist":"Weather Girls","decade":1980},{"id":175,"title":"I Ran","artist":"Flock Of Seagulls","decade":1980},{"id":176,"title":"Mickey","artist":"Tony Basil","decade":1980},{"id":177,"title":"99 Luft Balloons","artist":"Nena","decade":1980},{"id":178,"title":"Somebody's Watching Me","artist":"Rockwell","decade":1980},{"id":179,"title":"Oh Yeah","artist":"Yello","decade":1980},{"id":180,"title":"Word Up","artist":"Cameo","decade":1980},{"id":181,"title":"Tell It To My Heart","artist":"Taylor Dayne","decade":1980},{"id":182,"title":"All Around The World (been around the world ayayay)","artist":"Lisa Stansfield","decade":1980},{"id":183,"title":"Don't Stop Believin'","artist":"Journey","decade":1980},{"id":184,"title":"Love Will Tear Us Apart","artist":"Joy Division","decade":1980},{"id":185,"title":"I Touch Myself","artist":"Divynils","decade":1980},{"id":186,"title":"Sunglasses at Night","artist":"Corey Hart","decade":1980},{"id":187,"title":"Wonderful Life","artist":"Black","decade":1980},{"id":188,"title":"Coming Up Roses","artist":"Black","decade":1980},{"id":189,"title":"Superfreak","artist":"Rick James","decade":1980},{"id":190,"title":"Sexual Healing","artist":"Marvin Gaye","decade":1980},{"id":191,"title":"True","artist":"Spandau Ballet","decade":1980},{"id":192,"title":"Major Tom","artist":"Peter Schilling","decade":1980},{"id":193,"title":"How Soon is Now","artist":"The Smiths","decade":1980},{"id":194,"title":"Luka","artist":"Suzanne Vega","decade":1980},{"id":195,"title":"Tom's Diner","artist":"Suzanne Vega","decade":1980},{"id":196,"title":"One Night in Bangkok","artist":"Murray Head","decade":1980},{"id":197,"title":"Addicted to Love","artist":"Robert Palmer","decade":1980},{"id":198,"title":"Electric Dreams","artist":"Philip Oakey & Giorgio Moroder","decade":1980},{"id":199,"title":"All Out of Love","artist":"Air Supply","decade":1980},{"id":200,"title":"She Bop","artist":"Cindy Lauper","decade":1980},{"id":201,"title":"Fame","artist":"Irene Cara","decade":1980},{"id":202,"title":"9 to 5","artist":"Dolly Parton","decade":1980},{"id":203,"title":"Sweet Dreams","artist":"Eurythmics","decade":1980},{"id":204,"title":"Against All Odds (take a look at me now)","artist":"Phil Collins","decade":1980},{"id":205,"title":"I'm So Excited","artist":"The Pointer Sisters","decade":1980},{"id":206,"title":"Careless Whisper","artist":"George Michael","decade":1980},{"id":207,"title":"Can't Fight This Feeling","artist":"Reo Speedwagon","decade":1980},{"id":208,"title":"Manic Monday","artist":"The Bangles","decade":1980},{"id":209,"title":"Walk This Way","artist":"Run DMC ft. Aerosmith","decade":1980},{"id":210,"title":"Last Train to Trancentral","artist":"KLF (Justified Ancients of Mu Mu)","decade":1980},{"id":211,"title":"Nothing's Gonna Stop Us Now","artist":"Starship","decade":1980},{"id":212,"title":"Here I Go Again","artist":"Whitesnake","decade":1980},{"id":213,"title":"Ebony and Ivory","artist":"Paul McCartney & Stevie Wonder","decade":1980},{"id":214,"title":"Hard to Say I'm Sorry","artist":"Chicago","decade":1980},{"id":215,"title":"Heat of the Moment","artist":"Asia","decade":1980},{"id":216,"title":"Let's Groove","artist":"Earth Wind & Fire","decade":1980},{"id":217,"title":"Hot in the City","artist":"Billy Idol","decade":1980},{"id":218,"title":"Up Where We Belong","artist":"Jennifer Warnes & Joe Cocker","decade":1980},{"id":219,"title":"Too Shy","artist":"KajaGooGoo","decade":1980},{"id":220,"title":"Baker Man","artist":"Laid Back","decade":1980},{"id":221,"title":"Footloose","artist":"Kenny Loggins","decade":1980},{"id":222,"title":"Drive","artist":"The Cars","decade":1980},{"id":223,"title":"Saving All My Love for You","artist":"Whitney Houston","decade":1980},{"id":224,"title":"I'm on Fire","artist":"Bruce Springsteen","decade":1980},{"id":225,"title":"Living in America","artist":"James Brown","decade":1980},{"id":226,"title":"La Bamba","artist":"Los Lobos","decade":1980},{"id":227,"title":"Carrie","artist":"Europe","decade":1980},{"id":228,"title":"Pour Some Sugar on Me","artist":"Def Leppard","decade":1980},{"id":229,"title":"Kokomo","artist":"Beach Boys","decade":1980},{"id":230,"title":"The Heat Is On","artist":"Glenn Frey","decade":1980},{"id":231,"title":"Smooth Operator","artist":"Sade","decade":1980},{"id":232,"title":"Danger Zone","artist":"Kenny Loggins","decade":1980},{"id":233,"title":"Broken Wings","artist":"Mr. Mister","decade":1980},{"id":234,"title":"Sledgehammer","artist":"Peter Gabriel","decade":1980},{"id":235,"title":"Higher Love","artist":"Steve Winwood","decade":1980},{"id":236,"title":"Don't Dream It's Over (hey now)","artist":"Crowded House","decade":1980},{"id":237,"title":"Nothing's Gonna Change My Love For You","artist":"Glenn Medeiros","decade":1980},{"id":238,"title":"Boys","artist":"Sabrina","decade":1980},{"id":239,"title":"Hazard","artist":"Richard Marx","decade":1980},{"id":240,"title":"Rockit","artist":"Herbie Hencock","decade":1980},{"id":241,"title":"Spacer","artist":"Sheila","decade":1980},{"id":242,"title":"I Like Chopin","artist":"Gazebo","decade":1980},{"id":243,"title":"Can't Take My Eyes Off You","artist":"Franki Vall/Boys Town Gang/Lauryn Hill/Surf Mesa (ILY)","decade":1980},{"id":244,"title":"I Don't Wanna Dance","artist":"Eddy Grant","decade":1980},{"id":245,"title":"I Think We're Alone Now","artist":"Tiffany","decade":1980},{"id":246,"title":"Toy Soldiers","artist":"Martika","decade":1980},{"id":247,"title":"Love Shack","artist":"B52s","decade":1980},{"id":248,"title":"More Than This","artist":"Roxy Music","decade":1980},{"id":249,"title":"Escape (Pina Colada Song)","artist":"Rupert Holmes","decade":1980},{"id":250,"title":"Cars","artist":"Gary Numan","decade":1980},{"id":251,"title":"Woman in Love","artist":"Barbra Streisand","decade":1980},{"id":252,"title":"Live Is Life","artist":"Opus","decade":1980},{"id":253,"title":"I'm Every Woman","artist":"Chaka Khan","decade":1980},{"id":254,"title":"Ain't Nobody","artist":"Chaka Khan","decade":1980},{"id":255,"title":"Just the Two Of Us","artist":"Bill Withers & Grover Washington","decade":1980},{"id":256,"title":"Electric Avenue","artist":"Eddy Grant","decade":1980},{"id":257,"title":"Don't Stop the Dance","artist":"Bryan Ferry","decade":1980},{"id":258,"title":"Slave to Love","artist":"Bryan Ferry","decade":1980},{"id":259,"title":"Mr. Roboto","artist":"Styx","decade":1980},{"id":260,"title":"Rock the Casbah","artist":"The Clash","decade":1980},{"id":261,"title":"Lady in Red","artist":"Chris deBurgh","decade":1980},{"id":262,"title":"Neverending Story","artist":"Limahl","decade":1980},{"id":263,"title":"Black Velvet","artist":"Alannah Myles","decade":1980},{"id":264,"title":"Cheri Cheri Lady","artist":"Modern Talking","decade":1980},{"id":265,"title":"Tarzan Boy","artist":"Baltimora","decade":1980},{"id":266,"title":"Vamos a la Playa","artist":"Regheira","decade":1980},{"id":267,"title":"Loving You","artist":"Shanice","decade":1980},{"id":268,"title":"Push It","artist":"Salt-and-Pepa","decade":1980},{"id":269,"title":"Hallelujah","artist":"Leonard Cohen","decade":1980},{"id":270,"title":"Ella Elle L'a","artist":"France Gall","decade":1980},{"id":271,"title":"And She Was","artist":"Talking Heads","decade":1980},{"id":272,"title":"Dance Me to the End of Love","artist":"Leonard Cohen","decade":1980},{"id":273,"title":"Little Lies","artist":"Fleetwood Mac","decade":1980},{"id":274,"title":"I Want That Man (here comes the 21st century)","artist":"Debbie Harry","decade":1980},{"id":275,"title":"Dirty Old Town","artist":"The Pogues","decade":1980},{"id":276,"title":"Sign Your Name (across my heart)","artist":"Terrence Trent D'Arby","decade":1980},{"id":277,"title":"Wishing Well","artist":"Terrence Trent D'Arby","decade":1980},{"id":602,"title":"Stop the Rock","artist":"Apollo 440","decade":1999},{"id":279,"title":"How am I Supposed to Live Without You","artist":"Michael Bolton","decade":1990},{"id":280,"title":"I've Got the Power","artist":"Snap!","decade":1990},{"id":281,"title":"Rhythm is a Dancer","artist":"Snap!","decade":1990},{"id":282,"title":"Suicide Blonde","artist":"Inxs","decade":1990},{"id":283,"title":"Sadness (di mois)","artist":"Enigma","decade":1990},{"id":284,"title":"Everybody Dance Now","artist":"C&C Music Factory","decade":1990},{"id":285,"title":"Save Tonight","artist":"Eagle-Eye Cherry","decade":1990},{"id":286,"title":"I Wanna Sex You Upp","artist":"Colour Me Badd","decade":1990},{"id":287,"title":"Tears in Heaven","artist":"Eric Clapton","decade":1990},{"id":288,"title":"Leyla","artist":"Eric Clapton","decade":1990},{"id":289,"title":"Achy Breaky Heart","artist":"Billy Ray Cyrus","decade":1990},{"id":290,"title":"End of the Road","artist":"Boyz II Men","decade":1990},{"id":291,"title":"Informer","artist":"Snow","decade":1990},{"id":292,"title":"What is Love","artist":"Haddaway","decade":1990},{"id":293,"title":"It's My Life","artist":"Dr. Alban","decade":1990},{"id":294,"title":"Can't Help Falling in Love With You","artist":"UB40","decade":1990},{"id":295,"title":"What's Up","artist":"4-non-blondes","decade":1990},{"id":296,"title":"Power of Love","artist":"Celine Dion","decade":1990},{"id":297,"title":"I Swear","artist":"All-4-One","decade":1990},{"id":298,"title":"Cotton Eye Joe","artist":"Rednex","decade":1990},{"id":299,"title":"Here Comes the Hotstepper","artist":"Ini Kamoze","decade":1990},{"id":300,"title":"Waterfalls","artist":"TLC","decade":1990},{"id":301,"title":"No Scrubs","artist":"TLC","decade":1990},{"id":302,"title":"Children","artist":"Robert Miles","decade":1990},{"id":303,"title":"The Corrs","artist":"Breathless","decade":1990},{"id":304,"title":"Macarena","artist":"Los del Rio","decade":1990},{"id":305,"title":"California Love","artist":"2Pac & Dr. Dre","decade":1990},{"id":306,"title":"Killing Me Softly","artist":"Fugees","decade":1990},{"id":307,"title":"Unbreak My Heart","artist":"Tony Braxton","decade":1990},{"id":308,"title":"I Believe I Can Fly","artist":"R. Kelly","decade":1990},{"id":309,"title":"Mmmmbop","artist":"The Hansons","decade":1990},{"id":310,"title":"Bitch","artist":"Meredith Brooks","decade":1990},{"id":311,"title":"Tubthumping","artist":"Chumbawamba","decade":1990},{"id":312,"title":"Torn","artist":"Natalie Imbruglia","decade":1990},{"id":313,"title":"The Boy is Mine","artist":"Brandy & Monica","decade":1990},{"id":314,"title":"Crush","artist":"Jennifer Paige","decade":1990},{"id":315,"title":"Livin Da Vida Loca","artist":"Ricky Martin","decade":1990},{"id":316,"title":"Mambo no.5","artist":"Lou Bega","decade":1990},{"id":317,"title":"Blue","artist":"Eiffel 65","decade":1990},{"id":318,"title":"Sweet Harmony","artist":"Beloved","decade":1990},{"id":319,"title":"Loser","artist":"Beck","decade":1990},{"id":320,"title":"Born Slippy","artist":"Underworld","decade":1990},{"id":321,"title":"Babylon","artist":"David Gray","decade":1990},{"id":322,"title":"Alright","artist":"Supergrass","decade":1990},{"id":323,"title":"Groove is in the Heart","artist":"Dee-Lite","decade":1990},{"id":324,"title":"Rico Suave","artist":"Geraldo","decade":1990},{"id":325,"title":"Unbelievable","artist":"EMF","decade":1990},{"id":326,"title":"Walking in Memphis","artist":"Marc Cohn","decade":1990},{"id":327,"title":"Baby Got Back","artist":"Sir Mix-a-lot","decade":1990},{"id":328,"title":"To Be With You","artist":"Mr. Big","decade":1990},{"id":329,"title":"I'm Gonna Be (500 Miles)","artist":"The Proclaimers","decade":1990},{"id":330,"title":"Whoop There It Is","artist":"Tag Team","decade":1990},{"id":331,"title":"Rhythm of the Night","artist":"Corona","decade":1990},{"id":332,"title":"I Love You Always Forever","artist":"Donna Lewis","decade":1990},{"id":333,"title":"Missing (like a desert mystery)","artist":"Everything But The Girl","decade":1990},{"id":334,"title":"Return of the Mack","artist":"Mark Morisson","decade":1990},{"id":335,"title":"How Bizarre","artist":"OMC","decade":1990},{"id":336,"title":"Come Undone","artist":"Duran Duran","decade":1990},{"id":337,"title":"I Breathe","artist":"Vacuum","decade":1990},{"id":338,"title":"Lovefool","artist":"Cardigans","decade":1990},{"id":339,"title":"Bittersweet Symphony","artist":"The Verve","decade":1990},{"id":340,"title":"Moving On Up","artist":"M People","decade":1990},{"id":341,"title":"Kiss Me","artist":"Sixpence None the Richer","decade":1990},{"id":342,"title":"There She Goes","artist":"Sixpence None the Richer","decade":1990},{"id":343,"title":"Freed From Desire","artist":"Gala Rizzato","decade":1990},{"id":344,"title":"Call On Me","artist":"Eric Prydz","decade":1990},{"id":345,"title":"You Only Get What You Give","artist":"New Radicals","decade":1990},{"id":346,"title":"Someday You'll Know","artist":"New Radicals","decade":1990},{"id":347,"title":"Wannabe","artist":"Spice Girls","decade":1990},{"id":348,"title":"My Heart Will Go On","artist":"Celine Dion","decade":1990},{"id":349,"title":"You Oughta Now","artist":"Alanis Morissette","decade":1990},{"id":350,"title":"I Want it That Way","artist":"Backstreet Boys","decade":1990},{"id":351,"title":"Iris (and I don't want the world to see me)","artist":"Goo Goo Dolls","decade":1990},{"id":352,"title":"Don't Speak","artist":"No Doubt","decade":1990},{"id":353,"title":"Gangsta's Paradise","artist":"Coolio","decade":1990},{"id":354,"title":"Man! I Feel Like a Woman","artist":"Shania Twain","decade":1990},{"id":355,"title":"Jump","artist":"Kriss Kross","decade":1990},{"id":356,"title":"Somewhere Over The Rainbow","artist":"Israel IZ Kamakawiwo'ole","decade":1990},{"id":357,"title":"One Week","artist":"Barenaked Ladies","decade":1990},{"id":358,"title":"Virtual Insanity","artist":"Jamiroquai","decade":1990},{"id":359,"title":"Chains","artist":"Tina Arena","decade":1990},{"id":360,"title":"Jump Around","artist":"House of Pain","decade":1990},{"id":361,"title":"Cats in the Cradle","artist":"Ugly Kid Joe","decade":1990},{"id":362,"title":"The Bomb (these sounds)","artist":"The Bucketheads","decade":1990},{"id":363,"title":"More Than Words","artist":"Extreme","decade":1990},{"id":364,"title":"Wicked Game","artist":"Chris Isaak","decade":1990},{"id":365,"title":"Two Princes","artist":"Spin Doctors","decade":1990},{"id":366,"title":"74-75","artist":"Connels","decade":1990},{"id":367,"title":"Mmm Mmm Mmm Mmm","artist":"Crash Test Dummies","decade":1990},{"id":368,"title":"One of Us (if god was)","artist":"Joan Osborn","decade":1990},{"id":369,"title":"Coco Jumbo","artist":"Mr. President","decade":1990},{"id":370,"title":"Truly Madly Deeply","artist":"Savage Garden","decade":1990},{"id":371,"title":"To the Moon and Back","artist":"Savage Garden","decade":1990},{"id":372,"title":"Living on the Edge of the Night","artist":"Iggy Pop","decade":1990},{"id":373,"title":"Hard Knock Life","artist":"Jay Z","decade":1990},{"id":374,"title":"To the Moon & Back","artist":"Savage Garden","decade":1990},{"id":375,"title":"Hallelujah","artist":"Jeff Buckley","decade":1990},{"id":376,"title":"Ain't No Doubt","artist":"Jimmy Nail","decade":1990},{"id":377,"title":"Only Wanna Be With You","artist":"Hootie & the Blowfish","decade":1990},{"id":378,"title":"Breakfast at Tiffany's","artist":"Deep Blue Something","decade":1990},{"id":379,"title":"L'Ombelico Del Mondo","artist":"Jovanotti","decade":1990},{"id":380,"title":"Bye Bye Bye","artist":"*Nsync","decade":2000},{"id":381,"title":"She Bangs","artist":"Ricky Martin","decade":2000},{"id":382,"title":"Survivor","artist":"Destiny's Child","decade":2000},{"id":383,"title":"Independent Woman","artist":"Destiny's Child","decade":2000},{"id":384,"title":"Bootylicious","artist":"Destiny's Child","decade":2000},{"id":385,"title":"Love Don't Cost a Thing","artist":"J Lo","decade":2000},{"id":386,"title":"Wasn't Me","artist":"Shaggy ft. Rikrok","decade":2000},{"id":387,"title":"Modjo","artist":"Lady","decade":2000},{"id":388,"title":"Angel","artist":"Shaggy ft. Rikrok","decade":2000},{"id":389,"title":"Let Me Blow Your Mind","artist":"Eve ft. Gwen Stefani","decade":2000},{"id":390,"title":"Butterfly","artist":"Crazy Town","decade":2000},{"id":391,"title":"No One","artist":"Alicia Keys","decade":2000},{"id":392,"title":"Fallin","artist":"Alicia Keys","decade":2000},{"id":393,"title":"New York","artist":"Alicia Keys ft. Jay-Z","decade":2000},{"id":394,"title":"Can't Get You Out of My Head","artist":"Kylie Minogue","decade":2000},{"id":395,"title":"Family Affair (my name is desiree)","artist":"Mary J. Blige","decade":2000},{"id":396,"title":"Hero (i can be your hero baybe)","artist":"Enrique Iglesias","decade":2000},{"id":397,"title":"A Thousand Miles","artist":"Vanessa Carlton","decade":2000},{"id":398,"title":"Hot in Here","artist":"Nelly ft. Kelly Rowland","decade":2000},{"id":399,"title":"Stupidisco","artist":"Junior Jack","decade":2000},{"id":400,"title":"Dilemma (even when I'm with my boo)","artist":"Nelly ft. Kelly Rowland","decade":2000},{"id":401,"title":"Candy Shop","artist":"50 Cent","decade":2000},{"id":402,"title":"In Da Club (it's your birthday)","artist":"50 Cent","decade":2000},{"id":403,"title":"Sky Full of Stars","artist":"Coldplay","decade":2000},{"id":404,"title":"Clocks","artist":"Coldplay","decade":2000},{"id":405,"title":"Get Busy (siexy lady)","artist":"Sean Paul","decade":2000},{"id":406,"title":"If I Were a Boy","artist":"Beyonce","decade":2000},{"id":407,"title":"Crazy in Love","artist":"Beyonce","decade":2000},{"id":408,"title":"I Gotta Feeling","artist":"Black Eyed Peas","decade":2000},{"id":409,"title":"Shut Up","artist":"Black Eyed Peas","decade":2000},{"id":410,"title":"Pump It","artist":"Black Eyed Peas","decade":2000},{"id":411,"title":"Where Is the Love","artist":"Black Eyed Peas","decade":2000},{"id":412,"title":"My Humps","artist":"Black Eyed Peas","decade":2000},{"id":413,"title":"Boom Boom Pow","artist":"Black Eyed Peas","decade":2000},{"id":414,"title":"Meet Me Halfway","artist":"Black Eyed Peas","decade":2000},{"id":415,"title":"Hey Ya","artist":"Outkast","decade":2000},{"id":416,"title":"Ms Jackson","artist":"Outkast","decade":2000},{"id":417,"title":"My Boo (always be my boooooo)","artist":"Usher & Alicia Keys","decade":2000},{"id":418,"title":"Yeah! (too-tee too-tee)","artist":"Usher","decade":2000},{"id":419,"title":"She Will Be Loved","artist":"Maroon 5","decade":2000},{"id":420,"title":"This Love","artist":"Maroon 5","decade":2000},{"id":421,"title":"Dragosta Din Tei","artist":"O-Zone","decade":2000},{"id":422,"title":"The Reason (i find my reason to live)","artist":"Hoobastank","decade":2000},{"id":423,"title":"Girlfriend","artist":"Avril Lavigne","decade":2000},{"id":424,"title":"My Happy Ending","artist":"Avril Lavigne","decade":2000},{"id":425,"title":"Drop it Like It's Hot","artist":"Snoop ft. Pharell Williams","decade":2000},{"id":426,"title":"Feel Good","artist":"Gorillaz","decade":2000},{"id":427,"title":"Bad Day","artist":"Daniel Powter","decade":2000},{"id":428,"title":"Dance With Somebody","artist":"Mundo Diao","decade":2000},{"id":429,"title":"U're Beautiful","artist":"James Blunt","decade":2000},{"id":430,"title":"Don't Cha","artist":"Pussycat Dolls","decade":2000},{"id":431,"title":"Pushin Up My Buttons","artist":"Pussycat Dolls","decade":2000},{"id":432,"title":"Crazy (does that make me)","artist":"Gnarls Barkley","decade":2000},{"id":433,"title":"Say It Right","artist":"Nelly Furtado","decade":2000},{"id":434,"title":"Promiscuous Boy","artist":"Nelly Furtado","decade":2000},{"id":435,"title":"Sexyback","artist":"Justin Timberlake","decade":2000},{"id":436,"title":"Smack That","artist":"Akon ft. Eminem","decade":2000},{"id":437,"title":"Beautiful Liar","artist":"Beyonce & Shakira","decade":2000},{"id":438,"title":"Big Girls Don't Cry","artist":"Fergie","decade":2000},{"id":439,"title":"Hey There Delilah","artist":"Plain White Ts","decade":2000},{"id":440,"title":"Apologize","artist":"Timbaland","decade":2000},{"id":441,"title":"Bleeding Love","artist":"Leona Lewis","decade":2000},{"id":442,"title":"I Kissed a Girl","artist":"Katie Perry","decade":2000},{"id":443,"title":"Roar","artist":"Katie Perry","decade":2000},{"id":444,"title":"Right Round","artist":"Flo Rida","decade":2000},{"id":445,"title":"Pumped Up Kicks","artist":"Foster The People","decade":2000},{"id":446,"title":"I Bet You Look Good on the Dance Floor","artist":"Arctic Monkeys","decade":2000},{"id":447,"title":"Last Nite","artist":"The Strokes","decade":2000},{"id":448,"title":"Hard To Explain","artist":"The Strokes","decade":2000},{"id":449,"title":"Who Let the Dogs Out","artist":"Bahamen","decade":2000},{"id":450,"title":"Played-a-live","artist":"Safri Duo","decade":2000},{"id":451,"title":"The Way It Is","artist":"Bruce Hornsby & THe Range","decade":2000},{"id":452,"title":"Smile","artist":"Lilly Allen","decade":2000},{"id":453,"title":"No One Knows","artist":"Queens of the Stone Age","decade":2000},{"id":454,"title":"Use Somebody","artist":"Kings of Leon","decade":2000},{"id":455,"title":"Sex on Fire","artist":"Kings of Leon","decade":2000},{"id":456,"title":"Are You Gonna Be My Girl","artist":"Jet","decade":2000},{"id":457,"title":"Mr. Brightside","artist":"The Killers","decade":2000},{"id":458,"title":"Take Me Out","artist":"Franz Ferdinand","decade":2000},{"id":459,"title":"Since You Been Gone","artist":"Kelly Clarkson","decade":2000},{"id":460,"title":"Get Ur Freak On","artist":"Missy Elliot","decade":2000},{"id":461,"title":"Maps","artist":"Yeah Yeah Yeah","decade":2000},{"id":462,"title":"99 Problems","artist":"Jay Z","decade":2000},{"id":463,"title":"Absolutely (Story of a Girl)","artist":"Nine Days","decade":2000},{"id":464,"title":"Smooth Criminal (rock cover)","artist":"Alien Ant Farm","decade":2000},{"id":465,"title":"Ridin","artist":"Chamillionaire","decade":2000},{"id":466,"title":"Drive By","artist":"Train","decade":2000},{"id":467,"title":"Hey Soul Sister","artist":"Train","decade":2000},{"id":468,"title":"Drops of Jupiter","artist":"Train","decade":2000},{"id":469,"title":"That's Not My Name","artist":"The Ting Tings","decade":2000},{"id":470,"title":"Dancing in the Moonlight","artist":"Toploader","decade":2000},{"id":471,"title":"Destination Calabria","artist":"Alex Gaudino","decade":2000},{"id":472,"title":"Can't Fight the Moonlight","artist":"Lee Ann Rhymes","decade":2000},{"id":473,"title":"Oops I Did it Again","artist":"Britney Spears","decade":2000},{"id":474,"title":"Genie in the Bottle","artist":"Christina Aguillera","decade":2000},{"id":475,"title":"All-star","artist":"Smashmouth","decade":2000},{"id":476,"title":"Ruby","artist":"Kaiser Chiefs","decade":2000},{"id":477,"title":"How to Save a Life","artist":"The Frey","decade":2000},{"id":478,"title":"Ayo Technology","artist":"50 Cent/Milow","decade":2000},{"id":479,"title":"Asereje (Las Ketchup song)","artist":"Las Ketchup","decade":2000},{"id":480,"title":"Tik Tok (Don't Stop)","artist":"Keisha","decade":2010},{"id":481,"title":"Give Me Everything Tonight","artist":"Pitbull","decade":2010},{"id":482,"title":"Everyday I'm Shufflin","artist":"LMFAO","decade":2010},{"id":483,"title":"Sexy And I Know It","artist":"LMFAO","decade":2010},{"id":484,"title":"Promises","artist":"Calvin Harris & Sam Smith","decade":2010},{"id":485,"title":"Sometime I Get a Good Feelin","artist":"Flo Rida","decade":2010},{"id":486,"title":"Whistle","artist":"Flo Rida","decade":2010},{"id":487,"title":"Stronger (What Doesn't Kill You Makes You)","artist":"Kelly Clarkson","decade":2010},{"id":488,"title":"We Are Young","artist":"Fun.","decade":2010},{"id":489,"title":"Call Me Maybe","artist":"Carly Rae Jepsen","decade":2010},{"id":490,"title":"Waiting All Night","artist":"Rudimental","decade":2010},{"id":491,"title":"Stolen Dance","artist":"Milky Chance","decade":2010},{"id":492,"title":"Feel It Still","artist":"Portugal.The Man.","decade":2010},{"id":493,"title":"High Hopes","artist":"Panic! at the Disco","decade":2010},{"id":494,"title":"Midnight City","artist":"M83","decade":2010},{"id":495,"title":"Makeba","artist":"Jain","decade":2010},{"id":496,"title":"La La La","artist":"Naughty Boy","decade":2010},{"id":497,"title":"Never Going Back Together","artist":"Taylor Swift","decade":2010},{"id":498,"title":"Lost on You","artist":"LP","decade":2010},{"id":499,"title":"Gangam Style","artist":"Psy","decade":2010},{"id":500,"title":"Don't You Worry Child","artist":"Swedish House Mafia","decade":2010},{"id":501,"title":"Thrift Shop","artist":"Macklemore","decade":2010},{"id":502,"title":"Can't Hold Us","artist":"Macklemore","decade":2010},{"id":503,"title":"Harlem Shake","artist":"Baauer","decade":2010},{"id":504,"title":"Get Lucky","artist":"Daft Punk & Pharrel Williams","decade":2010},{"id":505,"title":"Blurred Lines","artist":"Robin Thicke","decade":2010},{"id":506,"title":"Timber","artist":"Pitbull & Keisha","decade":2010},{"id":507,"title":"All Of Me","artist":"John Legend","decade":2010},{"id":508,"title":"Fancy","artist":"Iggy Azalea & Charlie XCX","decade":2010},{"id":509,"title":"Problem","artist":"Ariana Grande","decade":2010},{"id":510,"title":"Stay With Me","artist":"Sam Smith","decade":2010},{"id":511,"title":"Youngblood","artist":"5 Seconds of Summer","decade":2010},{"id":512,"title":"Don't Call Me Up","artist":"Mabel","decade":2010},{"id":513,"title":"Superheroes (everyday every hour)","artist":"Script","decade":2010},{"id":603,"title":"Only Love Can Hurt Like This","artist":"Paloma Faith","decade":2010},{"id":514,"title":"Hello (I just came to say hello)","artist":"Dragonette","decade":2010},{"id":515,"title":"Rude (Marry Her Anyway)","artist":"Magic!","decade":2010},{"id":516,"title":"All About That Bass","artist":"Meghan Trainor","decade":2010},{"id":517,"title":"Uptown Funk","artist":"Mark Ronson & Bruno Mars","decade":2010},{"id":518,"title":"Take Me To Church","artist":"Hozier","decade":2010},{"id":519,"title":"Love Me Like You Do (ta ta touch)","artist":"Ellie Goulding","decade":2010},{"id":520,"title":"See U Again","artist":"Whiz Kalifa & Charlie Puth","decade":2010},{"id":521,"title":"Cheerleader","artist":"OMI","decade":2010},{"id":522,"title":"Lean On","artist":"Major Lazer","decade":2010},{"id":523,"title":"Hotline Bling","artist":"Drake","decade":2010},{"id":524,"title":"7 Years","artist":"Lukas Graham","decade":2010},{"id":525,"title":"Closer","artist":"The Chainsmokers","decade":2010},{"id":526,"title":"I Want Something Just Like This","artist":"The Chainsmokers","decade":2010},{"id":527,"title":"Heathens","artist":"21 Pilots","decade":2010},{"id":528,"title":"Stressed Out","artist":"21 Pilots","decade":2010},{"id":529,"title":"Despacito","artist":"Luis Fonsi","decade":2010},{"id":530,"title":"Rock Star","artist":"Post Malone","decade":2010},{"id":531,"title":"Circles (Run Away)","artist":"Post Malone","decade":2010},{"id":532,"title":"No Tears Left To Cry","artist":"Ariana Grande","decade":2010},{"id":533,"title":"This Is America","artist":"Childish Gambino","decade":2010},{"id":534,"title":"One Kiss (sensebilitis)","artist":"Calvin Harris & Dua Lipa","decade":2010},{"id":535,"title":"Happier","artist":"Marshmello & Bastille","decade":2010},{"id":536,"title":"Shallow","artist":"Lady Gaga & Bradley Cooper","decade":2010},{"id":537,"title":"Old Town Road","artist":"Lil Nas X & Billy Ray Cyrus","decade":2010},{"id":538,"title":"Senorita","artist":"Shawn Mendes & Camilla Cabello","decade":2010},{"id":539,"title":"Dance Monkey","artist":"Tones & I","decade":2010},{"id":540,"title":"Don't Start Now","artist":"Dua Lipa","decade":2010},{"id":541,"title":"Rivers (I follow)","artist":"Lyke Lee","decade":2010},{"id":542,"title":"Shut Up And Dance","artist":"Walk The Moon","decade":2010},{"id":543,"title":"Teach Me How To Doogie","artist":"Cali Swag District","decade":2010},{"id":544,"title":"Cooler Than Me","artist":"Mike Posner","decade":2010},{"id":545,"title":"Pill In Ibiza","artist":"Mike Posner","decade":2010},{"id":546,"title":"Safe & Sound","artist":"Capital Cities","decade":2010},{"id":547,"title":"Forget You (F U)","artist":"Cee Lo Green","decade":2010},{"id":548,"title":"Cool Kids","artist":"Echosmith","decade":2010},{"id":549,"title":"Love Me Again (I need to know now)","artist":"John Newman","decade":2010},{"id":550,"title":"Another Love","artist":"Tom Odello","decade":2010},{"id":551,"title":"Symphony","artist":"Clean Bandit","decade":2010},{"id":552,"title":"Someone You Loved","artist":"Lewis Capaldi","decade":2010},{"id":553,"title":"Little Talks (ship will carry on)","artist":"Of Monsters and Men","decade":2010},{"id":554,"title":"Echame La Culpa","artist":"Luis Fonsi & Demi Lovato","decade":2010},{"id":555,"title":"Waves (drifting awaaay)","artist":"Mr Probz","decade":2010},{"id":556,"title":"Calma (Vamos a la Playa)","artist":"Pedro Capo ft. Farruko","decade":2010},{"id":557,"title":"Rise (we don't give a f)","artist":"Jonas Blue","decade":2010},{"id":558,"title":"Habits (stay high)","artist":"Tove Lo","decade":2010},{"id":559,"title":"Rockabye","artist":"Clean Bandit","decade":2010},{"id":560,"title":"I Love It","artist":"Icona Pop","decade":2010},{"id":561,"title":"Let it Go","artist":"Idina Menzel","decade":2010},{"id":562,"title":"Video Games","artist":"Lana del Reys","decade":2010},{"id":563,"title":"Infinity","artist":"Jaymes Young","decade":2010},{"id":564,"title":"Let Me Love You","artist":"DJ Snake","decade":2010},{"id":565,"title":"Riptide","artist":"Vence Joy","decade":2010},{"id":566,"title":"We Can Do Better","artist":"Matt Simmons","decade":2010},{"id":567,"title":"What You Know","artist":"Two Door Cinema Club","decade":2010},{"id":568,"title":"Falling","artist":"Harry Styles","decade":2010},{"id":569,"title":"These Days","artist":"Rudimental","decade":2010},{"id":570,"title":"Geronimo","artist":"Sheppard","decade":2010},{"id":571,"title":"Give Me Everything Tonight","artist":"Pitbull ft. Afrojack","decade":2010},{"id":572,"title":"Tuesday","artist":"Burak Yeter","decade":2010},{"id":573,"title":"Say So","artist":"Doja Cat","decade":2020},{"id":574,"title":"Woman","artist":"Doja Cat","decade":2020},{"id":575,"title":"As It Was","artist":"Harry Styles","decade":2020},{"id":576,"title":"Watermelon Sugar High","artist":"Harry Styles","decade":2020},{"id":577,"title":"Dynamite (little fucking song)","artist":"BTS","decade":2020},{"id":578,"title":"Driver's License","artist":"Olivia Rodrigo","decade":2020},{"id":579,"title":"Good 4 U","artist":"Olivia Rodrigo","decade":2020},{"id":580,"title":"Peaches","artist":"Justin Bieber","decade":2020},{"id":581,"title":"Beggin","artist":"Maneskin","decade":2020},{"id":582,"title":"Stay (titititi tatatatatatatatata)","artist":"Kid Laroi","decade":2020},{"id":583,"title":"ABCDEFU","artist":"Gayle","decade":2020},{"id":584,"title":"Heat Waves","artist":"Glass Animals","decade":2020},{"id":585,"title":"Cake By The Ocean","artist":"Dnce","decade":2020},{"id":586,"title":"Won't Forget U","artist":"Shouse","decade":2020},{"id":587,"title":"High To Go","artist":"Chappell Roan","decade":2020},{"id":588,"title":"Greedy","artist":"Tate McRae","decade":2020},{"id":589,"title":"This Ain't Texas","artist":"Beyonce","decade":2020},{"id":590,"title":"Espresso","artist":"Sabrina Carpenter","decade":2020},{"id":591,"title":"Beautiful Things (staaaaaay)","artist":"Benson Boone","decade":2020},{"id":592,"title":"Never Going Home","artist":"Kungs","decade":2020},{"id":593,"title":"Out Out (just watch me dance)","artist":"Joel Corry x Jax Jones","decade":2020},{"id":594,"title":"Wellerman (sea shanty)","artist":"Nathan Evans","decade":2020},{"id":595,"title":"Don't Be Shy","artist":"Karol G and Tiesto","decade":2020},{"id":596,"title":"SNAP","artist":"Rosa Linn","decade":2020},{"id":597,"title":"Rampampam","artist":"Minelli","decade":2020},{"id":598,"title":"Calm Down","artist":"Rema","decade":2020},{"id":599,"title":"Ferrari","artist":"James Hype","decade":2020},{"id":600,"title":"Ordinary","artist":"Alex Warren","decade":2020},{"id":601,"title":"Lastin Lover","artist":"Sigala & James Arthur","decade":2020},{"id":604,"title":"Respect","artist":"Aretha Franklin","decade":1960},{"id":605,"title":"Like a Rolling Stone","artist":"Bob Dylan","decade":1960},{"id":606,"title":"My Girl","artist":"The Temptations","decade":1960},{"id":607,"title":"Stand by Me","artist":"Ben E. King","decade":1960},{"id":608,"title":"A Whiter Shade of Pale","artist":"Procol Harum","decade":1960},{"id":609,"title":"California Dreamin'","artist":"The Mamas & the Papas","decade":1960},{"id":610,"title":"The House of the Rising Sun","artist":"The Animals","decade":1960},{"id":611,"title":"I Heard It Through the Grapevine","artist":"Marvin Gaye","decade":1960},{"id":612,"title":"Son of a Preacher Man","artist":"Dusty Springfield","decade":1960},{"id":613,"title":"Superstition","artist":"Stevie Wonder","decade":1970},{"id":614,"title":"I Feel Love","artist":"Donna Summer","decade":1970},{"id":615,"title":"Rehab","artist":"Amy Winehouse","decade":2000},{"id":616,"title":"Valerie","artist":"Mark Ronson feat. Amy Winehouse","decade":2000},{"id":617,"title":"Paper Planes","artist":"M.I.A.","decade":2000},{"id":618,"title":"Kids","artist":"MGMT","decade":2000},{"id":619,"title":"Thinking Out Loud","artist":"Ed Sheeran","decade":2010},{"id":620,"title":"Blinding Lights","artist":"The Weeknd","decade":2010},{"id":621,"title":"Levitating","artist":"Dua Lipa","decade":2020},{"id":622,"title":"Anti-Hero","artist":"Taylor Swift","decade":2020},{"id":623,"title":"Bad Habit","artist":"Steve Lacy","decade":2020},{"id":624,"title":"Kill Bill","artist":"SZA","decade":2020},{"id":625,"title":"BIRDS OF A FEATHER","artist":"Billie Eilish","decade":2020},{"id":626,"title":"A Bar Song (Tipsy)","artist":"Shaboozey","decade":2020},{"id":627,"title":"Good Luck, Babe!","artist":"Chappell Roan","decade":2020},{"id":628,"title":"Die With a Smile","artist":"Lady Gaga & Bruno Mars","decade":2020},{"id":629,"title":"APT.","artist":"ROSÉ & Bruno Mars","decade":2020}];
+const STORAGE = 'musicQuizAudioProgressV1';
+const SETTINGS = 'musicQuizAudioSettingsV1';
+const HARD = 'musicQuizHardSongsV1';
+const $ = id => document.getElementById(id);
+const decades = [...new Set(SONGS.map(s => s.decade))].sort((a,b)=>a-b);
+let selected = new Set(decades);
+let history = [];
+let index = -1;
+let played = new Set();
+let markedHard = new Set();
+let hardOnly = false;
+let animations = false;
+let autoDecade = false;
+let activeAutoDecade = false;
+let current = null;
+let transitioning = false;
+let answerAdvanceTimer = null;
+let audioRequestSeq = 0;
+let activeSongAudioId = null;
+let previewMatches = restore('musicQuizAudioMatchedIdsV1') || {};
+const clip = $('clip-player');
+const BASE_DEEZER = 'https://api.deezer.com';
+function statusAudio(message, retry=false) {
+  $('audio-status').textContent=message;
+  $('retry-audio').hidden=!retry;
+}
+function stopAudio() {
+  audioRequestSeq++;
+  clip.pause(); clip.removeAttribute('src'); clip.load();
+  $('play-audio').disabled=true; $('play-audio').textContent='▶';
+  $('audio-time').textContent='0:00'; $('audio-duration').textContent='0:30'; $('audio-fill').style.width='0%';
+  activeSongAudioId=null;
+}
+function normalizeTrack(value) {
+  return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/\b(feat\.?|ft\.?|featuring)\b/gi,' ').replace(/[^a-zA-Z0-9 ]+/g,' ').replace(/\s+/g,' ').toLowerCase().trim();
+}
+function tidyTitle(value) {
+  return normalizeTrack(value).replace(/\b(remaster(?:ed)?|live|radio edit|single version|extended version|album version|original mix|mono|stereo|explicit|clean|version|edit|mix|digitally)\b/g,' ').replace(/\b(19|20)\d\d\b/g,' ').replace(/\s+/g,' ').trim();
+}
+function artistVariants(raw) {
+  return String(raw||'').split(/\s+(?:feat\.?|ft\.?|featuring|and|x)\s+|\s*[&,]\s*/i)
+    .map(normalizeTrack).filter(Boolean);
+}
+function scoreMatch(song, result) {
+  if(!result?.preview || !result?.artist?.name) return -1;
+  const desiredTitle=tidyTitle(song.title), gotTitle=tidyTitle(result.title_short || result.title);
+  // Reject different songs and covers, even if their search rank is high.
+  if(!desiredTitle || !gotTitle) return -1;
+  const matchTitle=desiredTitle===gotTitle || (desiredTitle.length>=8 && gotTitle.startsWith(desiredTitle+' ')) || (gotTitle.length>=8 && desiredTitle.startsWith(gotTitle+' '));
+  if(!matchTitle)return -1;
+  const artists=artistVariants(song.artist), got=normalizeTrack(result.artist.name);
+  const artistIsMatch=artists.some(a=>a===got || (a.length>5 && got.includes(a)) || (got.length>5 && a.includes(got)));
+  if(!artistIsMatch)return -1;
+  const titleExact=desiredTitle===gotTitle;
+  const artistExact=normalizeTrack(song.artist)===got;
+  // Penalize potentially different live performances and rerecordings.
+  const variation=normalizeTrack((result.title||'')+' '+(result.title_version||''));
+  const variantPenalty=/\b(live|karaoke|tribute|cover|instrumental|re recorded|acoustic)\b/.test(variation)?30:0;
+  return 60+(titleExact?30:0)+(artistExact?20:0)-variantPenalty;
+}
+function jsonpDeezer(path, limitMs=10000) {
+  return new Promise((resolve,reject)=>{
+    const cb='__mqDeezer_'+Math.random().toString(36).slice(2);
+    const script=document.createElement('script');
+    let done=false;
+    function finish(error,data){if(done)return;done=true;clearTimeout(timer);script.remove();delete window[cb];error?reject(error):resolve(data);}
+    const timer=setTimeout(()=>finish(new Error('Search timed out')),limitMs);
+    window[cb]=data=>finish(null,data);
+    script.onerror=()=>finish(new Error('Deezer could not be reached'));
+    script.src=BASE_DEEZER+path+(path.includes('?')?'&':'?')+'output=jsonp&callback='+cb;
+    document.head.appendChild(script);
+  });
+}
+async function getPreview(song, force=false) {
+  const cached=!force && previewMatches[song.id];
+  if(cached) {
+    try {
+      const item=await jsonpDeezer('/track/'+encodeURIComponent(cached));
+      if(item?.preview && scoreMatch(song,item)>=60)return item;
+    }catch(_) {}
+    delete previewMatches[song.id];
+  }
+  // Search title and artist first; a looser title-only search is the fallback.
+  const queries=[song.title+' '+song.artist, song.title];
+  let best=null, bestScore=-1;
+  for(const query of queries){
+    const result=await jsonpDeezer('/search?q='+encodeURIComponent(query)+'&limit=25');
+    if(result?.error)throw new Error(result.error.message||'Deezer search error');
+    for(const candidate of result.data||[]){
+      const score=scoreMatch(song,candidate);
+      if(score>bestScore){bestScore=score;best=candidate;}
+    }
+    if(bestScore>=90)break;
+  }
+  if(!best || bestScore<60) return null;
+  previewMatches[song.id]=best.id;
+  store('musicQuizAudioMatchedIdsV1',previewMatches);
+  return best;
+}
+async function prepareAudio(force=false){
+  if(!current)return;
+  const song=current;
+  stopAudio();
+  const seq=audioRequestSeq;
+  statusAudio('Finding 30-second preview…');
+  try {
+    const matched=await getPreview(song,force);
+    if(seq!==audioRequestSeq || current?.id!==song.id)return;
+    if(!matched?.preview){statusAudio('No verified preview found for this song. You can skip it or retry.',true);return;}
+    clip.src=matched.preview; clip.load();
+    activeSongAudioId=song.id;
+    $('play-audio').disabled=false;
+    statusAudio('Ready · tap play to listen');
+  }catch(error){
+    if(seq!==audioRequestSeq)return;
+    statusAudio('Preview search unavailable. Check your connection and retry.',true);
+  }
+}
+function refreshAudioControls(){
+  $('play-audio').textContent=clip.paused?'▶':'Ⅱ';
+  const duration=Number.isFinite(clip.duration)?clip.duration:30;
+  const elapsed=Number.isFinite(clip.currentTime)?clip.currentTime:0;
+  $('audio-time').textContent=`${Math.floor(elapsed/60)}:${String(Math.floor(elapsed%60)).padStart(2,'0')}`;
+  $('audio-duration').textContent=`${Math.floor(duration/60)}:${String(Math.floor(duration%60)).padStart(2,'0')}`;
+  $('audio-fill').style.width=(duration?Math.min(100,100*elapsed/duration):0)+'%';
+}
+$('play-audio').onclick=async()=>{
+  if(!current || current.id!==activeSongAudioId)return;
+  if(!clip.paused){clip.pause();return;}
+  if(clip.ended)clip.currentTime=0;
+  try{await clip.play();statusAudio('Playing preview · tap to pause');}
+  catch(_){statusAudio('Playback could not start. Tap play again or retry.',true);}
+};
+$('retry-audio').onclick=()=>prepareAudio(true);
+clip.addEventListener('timeupdate',refreshAudioControls);
+clip.addEventListener('pause',refreshAudioControls);
+clip.addEventListener('play',refreshAudioControls);
+clip.addEventListener('ended',()=>{refreshAudioControls();statusAudio('Preview ended · tap play to listen again');});
+clip.addEventListener('error',()=>{if(activeSongAudioId===current?.id)statusAudio('Audio could not load. Retry or skip this song.',true);});
+function cancelAnswerAdvance() {
+  if (answerAdvanceTimer !== null) {
+    clearTimeout(answerAdvanceTimer);
+    answerAdvanceTimer = null;
+  }
+}
+let activeDecades = [];
+let activeHardOnly = false;
+const card = $('question-card');
+function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {} }
+function restore(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; } }
+function pool() { return SONGS.filter(s => activeDecades.includes(s.decade) && (!activeHardOnly || markedHard.has(s.id))); }
+function countSelected() { return SONGS.filter(s=>selected.has(s.decade) && (!hardOnly || markedHard.has(s.id))).length; }
+function saveProgress() { if (activeDecades.length) store(STORAGE,{activeDecades, activeHardOnly, activeAutoDecade, history, index, played:[...played]}); }
+function updateHardLabel() { $('hard-only-label').textContent = `Hard songs only (${markedHard.size})`; }
+function renderDecades() {
+  const grid = $('decade-grid'); grid.replaceChildren();
+  for (const decade of decades) {
+    const b=document.createElement('button'); b.type='button'; b.className='decade-button';
+    const amount=SONGS.filter(s=>s.decade===decade).length;
+    const title=document.createElement('strong'); title.textContent=`${decade}s`;
+    const subtitle=document.createElement('span'); subtitle.textContent=`${amount} songs`;
+    b.append(title,subtitle);
+    b.classList.toggle('selected',selected.has(decade));
+    b.setAttribute('aria-pressed',String(selected.has(decade)));
+    b.onclick=()=>{ if(selected.has(decade))selected.delete(decade); else selected.add(decade); updateSelection(); };
+    grid.appendChild(b);
+  }
+  updateSelection(false);
+}
+function updateSelection(rebuild=true) {
+  if(rebuild) renderDecades();
+  const allSelected=selected.size===decades.length;
+  $('all-button').classList.toggle('selected',allSelected);
+  $('all-button').setAttribute('aria-pressed',String(allSelected));
+  const n=countSelected();
+  $('selection-summary').textContent=`${selected.size} ${selected.size===1?'decade':'decades'} selected · ${n} available ${n===1?'song':'songs'}`;
+  $('start-button').disabled=selected.size===0 || n===0;
+  $('load-status').textContent=hardOnly && n===0?'No starred songs in these decades yet.':' ';
+  store(SETTINGS,{selected:[...selected],hardOnly,animations,autoDecade});
+}
+function showScreen(name) {
+  cancelAnswerAdvance();
+  stopAudio();
+  $('set-screen').classList.toggle('active',name==='set');
+  $('quiz-screen').classList.toggle('active',name==='quiz');
+  window.scrollTo(0,0);
+}
+function entry() { return history[index]; }
+function syncReveals() {
+  if(!current)return;
+  const e=entry();
+  if(activeAutoDecade)e.decade=true;
+  $('artist-box').textContent=e.answer?current.artist:'';
+  $('title-box').textContent=e.title?current.title:'';
+  $('song-decade').textContent=e.decade?`${current.decade}s`:'';
+  $('artist-box').classList.toggle('visible',!!e.answer);
+  $('title-box').classList.toggle('visible',!!e.title);
+  $('song-decade').hidden=!e.decade;
+  $('show-answer').disabled=!!e.answer;
+  $('show-title').disabled=!!e.title;
+  $('show-decade').disabled=!!e.decade;
+  const hard=markedHard.has(current.id);
+  $('mark-hard').classList.toggle('active',hard);
+  $('mark-hard').setAttribute('aria-pressed',String(hard));
+  $('mark-hard').title=hard?'Remove hard mark':'Mark as hard';
+}
+function renderQuestion() {
+  current=SONGS.find(s=>s.id===entry()?.id) || null;
+  if(!current){renderEnd();return;}
+  $('question-text').textContent='Mystery song';
+  $('progress').textContent=`Song ${index+1} of ${pool().length}`;
+  $('quiz-status').textContent='';
+  $('previous-question').disabled=index<=0;
+  $('mark-hard').disabled=false;
+  $('next-question').textContent='Next song';
+  $('next-question').onclick=next;
+  syncReveals(); saveProgress(); prepareAudio();
+}
+function renderEnd() {
+  stopAudio();current=null;
+  $('question-text').textContent=`You've finished all ${pool().length} songs!`;
+  $('progress').textContent='Quiz complete';
+  $('quiz-status').textContent='Restart with the same decades, or choose different ones.';
+  $('artist-box').classList.remove('visible'); $('title-box').classList.remove('visible'); $('song-decade').hidden=true;
+  $('artist-box').textContent=''; $('title-box').textContent='';
+  $('previous-question').disabled=history.length===0;
+  $('mark-hard').disabled=true; $('mark-hard').classList.remove('active');
+  $('show-answer').disabled=true; $('show-title').disabled=true; $('show-decade').disabled=true;
+  $('next-question').textContent='Start again';
+  $('next-question').onclick=()=>startQuiz(true);
+  statusAudio('Quiz completed');
+  saveProgress();
+}
+function appendQuestion() {
+  const remaining=pool().filter(s=>!played.has(s.id));
+  if(!remaining.length)return false;
+  const q=remaining[Math.floor(Math.random()*remaining.length)];
+  played.add(q.id); history.push({id:q.id,answer:false,title:false,decade:false}); index=history.length-1;
+  return true;
+}
+function doNext() {
+  if(index<history.length-1)index++;
+  else if(!appendQuestion()){index=history.length;renderEnd();return;}
+  renderQuestion();
+}
+function doPrevious() { if(index>0){ index--; renderQuestion(); } }
+function navigate(direction,fn) {
+  if(transitioning)return;
+  if(!animations){fn();return;}
+  transitioning=true;
+  card.style.opacity='0'; card.style.transform=`translateX(${direction==='next'?'-28px':'28px'})`;
+  setTimeout(()=>{
+    fn(); card.classList.add('dragging');
+    card.style.transform=`translateX(${direction==='next'?'28px':'-28px'})`;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      card.classList.remove('dragging');card.style.opacity='1';card.style.transform='translateX(0)';
+      setTimeout(()=>{card.style.transform='';card.style.opacity='';transitioning=false;},190);
+    }));
+  },190);
+}
+function next() { stopAudio(); cancelAnswerAdvance(); if(current || index===history.length) navigate('next',doNext); }
+function previous() { stopAudio(); cancelAnswerAdvance(); if(index>0)navigate('previous',doPrevious); }
+function setLabel() {
+  $('set-label').textContent=(activeDecades.length===decades.length?'All decades':activeDecades.map(d=>`${d}s`).join(', ')) + (activeHardOnly?' · hard only':'');
+}
+function startQuiz(restart=false) {
+  if(!restart){activeDecades=[...selected].sort((a,b)=>a-b);activeHardOnly=hardOnly;activeAutoDecade=autoDecade;}
+  if(!activeDecades.length || !pool().length){showScreen('set');return;}
+  history=[]; index=-1;played=new Set(); current=null;
+  setLabel();showScreen('quiz');doNext();
+}
+function restoreProgress() {
+  const p=restore(STORAGE);
+  if(!p || !Array.isArray(p.activeDecades) || !Array.isArray(p.history))return;
+  const valid=new Set(SONGS.map(s=>s.id));
+  activeDecades=p.activeDecades.filter(d=>decades.includes(d));
+  activeHardOnly=!!p.activeHardOnly;
+  activeAutoDecade=!!p.activeAutoDecade;
+  history=p.history.filter(e=>valid.has(e.id)).map(e=>({id:e.id,answer:!!e.answer,title:!!e.title,decade:!!e.decade}));
+  if(!activeDecades.length || !history.length)return;
+  played=new Set(history.map(e=>e.id));
+  index=Math.max(0,Math.min(Number(p.index)||0,history.length));
+  setLabel();showScreen('quiz');
+  if(index===history.length)renderEnd(); else renderQuestion();
+  $('quiz-status').textContent='Resumed your previous session.';
+}
+$('all-button').onclick=()=>{selected=new Set(decades);updateSelection();};
+$('start-button').onclick=()=>startQuiz();
+$('change-set').onclick=()=>{selected=new Set(activeDecades);hardOnly=activeHardOnly;autoDecade=activeAutoDecade;$('hard-only-toggle').checked=hardOnly;$('auto-decade-toggle').checked=autoDecade;updateSelection();showScreen('set');};
+$('previous-question').onclick=previous;
+function maybeAutoAdvance(){
+  cancelAnswerAdvance();
+  if(!current || !entry()?.answer || !entry()?.title)return;
+  const songId=current.id;
+  answerAdvanceTimer=setTimeout(()=>{
+    answerAdvanceTimer=null;
+    if(current?.id===songId && entry()?.answer && entry()?.title && $('quiz-screen').classList.contains('active'))next();
+  },1500);
+}
+$('show-answer').onclick=()=>{if(current && !entry().answer){entry().answer=true;syncReveals();saveProgress();maybeAutoAdvance();}};
+$('show-title').onclick=()=>{if(current && !entry().title){entry().title=true;syncReveals();saveProgress();maybeAutoAdvance();}};
+$('show-decade').onclick=()=>{if(current){entry().decade=true;syncReveals();saveProgress();}};
+$('mark-hard').onclick=()=>{if(!current)return; if(markedHard.has(current.id))markedHard.delete(current.id);else markedHard.add(current.id);store(HARD,[...markedHard]);updateHardLabel();syncReveals();};
+$('animations-toggle').onchange=e=>{animations=e.target.checked;updateSelection(false);};
+$('hard-only-toggle').onchange=e=>{hardOnly=e.target.checked;updateSelection(false);};
+$('auto-decade-toggle').onchange=e=>{autoDecade=e.target.checked;updateSelection(false);};
+document.addEventListener('keydown',e=>{
+  if(!$('quiz-screen').classList.contains('active') || /INPUT|TEXTAREA|BUTTON|SELECT/.test(e.target.tagName))return;
+  if(e.key==='ArrowLeft'){e.preventDefault();previous();}
+  if(e.key==='ArrowRight'){e.preventDefault();$('next-question').click();}
+});
+let touchStart=null;
+card.addEventListener('touchstart',e=>{if(e.touches.length===1 && !e.target.closest('button'))touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY};else touchStart=null;},{passive:true});
+card.addEventListener('touchend',e=>{
+  if(!touchStart || !e.changedTouches.length)return;
+  const dx=e.changedTouches[0].clientX-touchStart.x,dy=e.changedTouches[0].clientY-touchStart.y;
+  touchStart=null;
+  if(Math.abs(dx)<70 || Math.abs(dy)>80 || Math.abs(dx)<1.25*Math.abs(dy))return;
+  if(dx<0)$('next-question').click();else previous();
+},{passive:true});
+const savedSettings=restore(SETTINGS);
+if(savedSettings){
+  if(Array.isArray(savedSettings.selected))selected=new Set(savedSettings.selected.filter(d=>decades.includes(d)));
+  hardOnly=!!savedSettings.hardOnly;animations=!!savedSettings.animations;autoDecade=!!savedSettings.autoDecade;
+}
+const savedHard=restore(HARD);
+if(Array.isArray(savedHard))markedHard=new Set(savedHard.filter(id=>Number.isInteger(id)));
+$('animations-toggle').checked=animations;
+$('hard-only-toggle').checked=hardOnly;
+$('auto-decade-toggle').checked=autoDecade;
+updateHardLabel();renderDecades();restoreProgress();
+</script>
+</body>
+</html>
