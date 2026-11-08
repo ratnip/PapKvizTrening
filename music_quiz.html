@@ -303,6 +303,7 @@
 <div id="decade-grid" class="decade-grid"></div>
 <p id="selection-summary" class="select-summary"></p>
 <label class="option-row" for="animations-toggle"><input id="animations-toggle" type="checkbox"><div>Animations<br><span>Animate swipes and transitions between songs.</span></div></label>
+<label class="option-row" for="auto-decade-toggle"><input id="auto-decade-toggle" type="checkbox"><div>Show decade with song<br><span>Reveal the decade immediately when each question appears.</span></div></label>
 <label class="option-row" for="hard-only-toggle"><input id="hard-only-toggle" type="checkbox"><div><span id="hard-only-label">Hard songs only (0)</span><br><span>Practice songs you marked with the star.</span></div></label>
 <button id="start-button" class="start-button" type="button">Start music quiz</button>
 <p id="load-status" class="status"></p>
@@ -339,6 +340,8 @@ let played = new Set();
 let markedHard = new Set();
 let hardOnly = false;
 let animations = false;
+let autoDecade = false;
+let activeAutoDecade = false;
 let current = null;
 let transitioning = false;
 let answerAdvanceTimer = null;
@@ -355,7 +358,7 @@ function store(key, value) { try { localStorage.setItem(key, JSON.stringify(valu
 function restore(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; } }
 function pool() { return SONGS.filter(s => activeDecades.includes(s.decade) && (!activeHardOnly || markedHard.has(s.id))); }
 function countSelected() { return SONGS.filter(s=>selected.has(s.decade) && (!hardOnly || markedHard.has(s.id))).length; }
-function saveProgress() { if (activeDecades.length) store(STORAGE,{activeDecades, activeHardOnly, history, index, played:[...played]}); }
+function saveProgress() { if (activeDecades.length) store(STORAGE,{activeDecades, activeHardOnly, activeAutoDecade, history, index, played:[...played]}); }
 function updateHardLabel() { $('hard-only-label').textContent = `Hard songs only (${markedHard.size})`; }
 function renderDecades() {
   const grid = $('decade-grid'); grid.replaceChildren();
@@ -381,7 +384,7 @@ function updateSelection(rebuild=true) {
   $('selection-summary').textContent=`${selected.size} ${selected.size===1?'decade':'decades'} selected · ${n} available ${n===1?'song':'songs'}`;
   $('start-button').disabled=selected.size===0 || n===0;
   $('load-status').textContent=hardOnly && n===0?'No starred songs in these decades yet.':' ';
-  store(SETTINGS,{selected:[...selected],hardOnly,animations});
+  store(SETTINGS,{selected:[...selected],hardOnly,animations,autoDecade});
 }
 function showScreen(name) {
   cancelAnswerAdvance();
@@ -393,6 +396,7 @@ function entry() { return history[index]; }
 function syncReveals() {
   if(!current)return;
   const e=entry();
+  if(activeAutoDecade) e.decade=true;
   $('answer-box').textContent=e.answer?current.artist:'';
   $('decade-box').textContent=e.decade?`Decade: ${current.decade}s`:'';
   $('answer-box').classList.toggle('visible',!!e.answer);
@@ -462,7 +466,7 @@ function setLabel() {
   $('set-label').textContent=(activeDecades.length===decades.length?'All decades':activeDecades.map(d=>`${d}s`).join(', ')) + (activeHardOnly?' · hard only':'');
 }
 function startQuiz(restart=false) {
-  if(!restart){activeDecades=[...selected].sort((a,b)=>a-b);activeHardOnly=hardOnly;}
+  if(!restart){activeDecades=[...selected].sort((a,b)=>a-b);activeHardOnly=hardOnly;activeAutoDecade=autoDecade;}
   if(!activeDecades.length || !pool().length){showScreen('set');return;}
   history=[]; index=-1;played=new Set(); current=null;
   setLabel();showScreen('quiz');doNext();
@@ -473,6 +477,7 @@ function restoreProgress() {
   const valid=new Set(SONGS.map(s=>s.id));
   activeDecades=p.activeDecades.filter(d=>decades.includes(d));
   activeHardOnly=!!p.activeHardOnly;
+  activeAutoDecade=!!p.activeAutoDecade;
   history=p.history.filter(e=>valid.has(e.id)).map(e=>({id:e.id,answer:!!e.answer,decade:!!e.decade}));
   if(!activeDecades.length || !history.length)return;
   played=new Set(history.map(e=>e.id));
@@ -483,7 +488,7 @@ function restoreProgress() {
 }
 $('all-button').onclick=()=>{selected=new Set(decades);updateSelection();};
 $('start-button').onclick=()=>startQuiz();
-$('change-set').onclick=()=>{selected=new Set(activeDecades);hardOnly=activeHardOnly;$('hard-only-toggle').checked=hardOnly;updateSelection();showScreen('set');};
+$('change-set').onclick=()=>{selected=new Set(activeDecades);hardOnly=activeHardOnly;autoDecade=activeAutoDecade;$('hard-only-toggle').checked=hardOnly;$('auto-decade-toggle').checked=autoDecade;updateSelection();showScreen('set');};
 $('previous-question').onclick=previous;
 $('show-answer').onclick=()=>{
   if(!current || entry().answer)return;
@@ -501,6 +506,7 @@ $('show-decade').onclick=()=>{if(current){entry().decade=true;syncReveals();save
 $('mark-hard').onclick=()=>{if(!current)return; if(markedHard.has(current.id))markedHard.delete(current.id);else markedHard.add(current.id);store(HARD,[...markedHard]);updateHardLabel();syncReveals();};
 $('animations-toggle').onchange=e=>{animations=e.target.checked;updateSelection(false);};
 $('hard-only-toggle').onchange=e=>{hardOnly=e.target.checked;updateSelection(false);};
+$('auto-decade-toggle').onchange=e=>{autoDecade=e.target.checked;updateSelection(false);};
 document.addEventListener('keydown',e=>{
   if(!$('quiz-screen').classList.contains('active') || /INPUT|TEXTAREA|BUTTON|SELECT/.test(e.target.tagName))return;
   if(e.key==='ArrowLeft'){e.preventDefault();previous();}
@@ -518,12 +524,13 @@ card.addEventListener('touchend',e=>{
 const savedSettings=restore(SETTINGS);
 if(savedSettings){
   if(Array.isArray(savedSettings.selected))selected=new Set(savedSettings.selected.filter(d=>decades.includes(d)));
-  hardOnly=!!savedSettings.hardOnly;animations=!!savedSettings.animations;
+  hardOnly=!!savedSettings.hardOnly;animations=!!savedSettings.animations;autoDecade=!!savedSettings.autoDecade;
 }
 const savedHard=restore(HARD);
 if(Array.isArray(savedHard))markedHard=new Set(savedHard.filter(id=>Number.isInteger(id)));
 $('animations-toggle').checked=animations;
 $('hard-only-toggle').checked=hardOnly;
+$('auto-decade-toggle').checked=autoDecade;
 updateHardLabel();renderDecades();restoreProgress();
 </script>
 </body>
