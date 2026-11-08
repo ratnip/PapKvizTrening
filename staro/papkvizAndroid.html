@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <title>Pap Kviz Android</title>
+    <style>
+        :root {
+            --bg: #000;
+            --card: #121212;
+            --card-2: #1b1b1b;
+            --text: #f2f2f2;
+            --muted: #bdbdbd;
+            --border: #333;
+            --primary: #1565c0;
+            --primary-pressed: #0d47a1;
+            --success: #2e7d32;
+            --danger: #b71c1c;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+        }
+
+        .app {
+            width: 100%;
+            max-width: 620px;
+            min-height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: linear-gradient(#000 78%, rgba(0, 0, 0, 0));
+            padding: 14px 0 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.35rem, 6vw, 2rem);
+            line-height: 1.15;
+            text-align: center;
+        }
+
+        h2 {
+            margin: 0 0 12px;
+            font-size: 1.2rem;
+        }
+
+        p {
+            line-height: 1.45;
+        }
+
+        .screen {
+            display: none;
+            flex: 1;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+        }
+
+        .set-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 18px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--card-2);
+            color: var(--text);
+            font-size: 1rem;
+            user-select: none;
+        }
+
+        .option-row input {
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            accent-color: var(--primary);
+        }
+
+        .option-row span {
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        button {
+            width: 100%;
+            min-height: 52px;
+            padding: 14px 16px;
+            border: 0;
+            border-radius: 14px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            background: var(--primary-pressed);
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #555;
+            color: #aaa;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .set-button {
+            min-height: 72px;
+            background: var(--card-2);
+            border: 1px solid #444;
+        }
+
+        .set-button strong {
+            display: block;
+            font-size: 1.35rem;
+            margin-bottom: 4px;
+        }
+
+        .set-button span {
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-weight: 400;
+        }
+
+        .quiz-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .small-button {
+            width: auto;
+            min-height: 38px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: #333;
+            font-size: 0.9rem;
+        }
+
+        .question-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+            will-change: transform, opacity;
+            transition: transform 180ms ease, opacity 180ms ease;
+            touch-action: pan-y;
+        }
+
+        .question-card.dragging {
+            transition: none;
+        }
+
+        .question-text {
+            margin: 0;
+            font-size: clamp(1.25rem, 6vw, 1.75rem);
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .reveals {
+            display: grid;
+            gap: 10px;
+        }
+
+        .result-box {
+            display: none;
+            margin: 0;
+            padding: 14px;
+            border-radius: 14px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            font-size: 1.08rem;
+            overflow-wrap: anywhere;
+        }
+
+        .result-box.visible {
+            display: block;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 52px 52px minmax(0, 1fr) minmax(0, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .back-button,
+        .hard-button {
+            width: 52px;
+            min-width: 52px;
+            padding: 0;
+            font-size: 1.35rem;
+        }
+
+        .hard-button {
+            background: #424242;
+        }
+
+        .hard-button.active {
+            background: #f9a825;
+            color: #111;
+        }
+
+        .next-button {
+            grid-column: 1 / -1;
+            background: var(--success);
+            min-height: 58px;
+        }
+
+        .status {
+            color: var(--muted);
+            text-align: center;
+            margin: 12px 0 0;
+            min-height: 1.4em;
+        }
+
+        .error {
+            color: #ff8a80;
+        }
+
+        @media (min-width: 520px) {
+            .set-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header>
+            <h1>Pap Kviz Trening!</h1>
+        </header>
+
+        <section id="set-screen" class="screen active">
+            <div class="card">
+                <h2>Odaberi set</h2>
+                <p>Prvo odaberi jedan set pitanja. Nakon toga će se pitanja prikazivati jedno po jedno.</p>
+                <div class="set-grid" id="set-grid"></div>
+
+                <label class="option-row" for="animations-toggle">
+                    <input id="animations-toggle" type="checkbox">
+                    <div>
+                        Animacije
+                        <br><span>Uključi vizualni swipe i slide prijelaze.</span>
+                    </div>
+                </label>
+
+                <label class="option-row" for="hard-only-toggle">
+                    <input id="hard-only-toggle" type="checkbox">
+                    <div>
+                        <span id="hard-only-label">Samo teška pitanja (0)</span>
+                        <br><span>Vježbaj samo pitanja koja si označio/la zvjezdicom.</span>
+                    </div>
+                </label>
+
+                <p id="load-status" class="status">Učitavam pitanja...</p>
+            </div>
+        </section>
+
+        <section id="quiz-screen" class="screen">
+            <div class="quiz-topbar">
+                <button id="change-set" class="small-button" type="button">Promijeni set</button>
+                <span id="set-label"></span>
+            </div>
+
+            <div class="card question-card">
+                <div>
+                    <p id="progress" class="status"></p>
+                    <h2 id="question-text" class="question-text"></h2>
+                </div>
+
+                <div class="reveals">
+                    <p id="answer-box" class="result-box"></p>
+                    <p id="number-box" class="result-box"></p>
+                </div>
+
+                <div class="actions">
+                    <button id="previous-question" class="back-button" type="button" aria-label="Prethodno pitanje">&lt;</button>
+                    <button id="mark-hard" class="hard-button" type="button" aria-label="Označi kao teško">⭐</button>
+                    <button id="show-answer" type="button">Pokaži odgovor</button>
+                    <button id="show-number" type="button">Broj pitanja</button>
+                    <button id="next-question" class="next-button" type="button">Dalje</button>
+                </div>
+
+                <p id="quiz-status" class="status"></p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const SETS = [
+            { id: 1, min: 1, max: 400 },
+            { id: 2, min: 401, max: 800 },
+            { id: 3, min: 801, max: 1200 },
+            { id: 4, min: 1201, max: 1600 },
+            { id: 5, min: 1601, max: 2000 },
+            { id: 6, min: 2001, max: 2400 }
+        ];
+
+        const STORAGE_KEY = 'papKvizAndroidProgressV4';
+        const SETTINGS_KEY = 'papKvizAndroidSettingsV2';
+        const HARD_QUESTIONS_KEY = 'papKvizAndroidHardQuestionsV1';
+        const SWIPE_MIN_DISTANCE = 70;
+        const SWIPE_MAX_VERTICAL_DRIFT = 80;
+        const SWIPE_DRAG_LIMIT = 140;
+        const ANIMATION_MS = 180;
+
+        let allQuestions = [];
+        let activeSet = null;
+        let playedQuestions = new Set();
+        let history = [];
+        let currentIndex = -1;
+        let currentQuestion = null;
+        let answerVisible = false;
+        let numberVisible = false;
+        let isAnimating = false;
+        let animationsEnabled = false;
+        let hardOnlyEnabled = false;
+        let hardQuestions = new Set();
+
+        const setScreen = document.getElementById('set-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const setGrid = document.getElementById('set-grid');
+        const loadStatus = document.getElementById('load-status');
+        const setLabel = document.getElementById('set-label');
+        const animationsToggle = document.getElementById('animations-toggle');
+        const hardOnlyToggle = document.getElementById('hard-only-toggle');
+        const hardOnlyLabel = document.getElementById('hard-only-label');
+        const progress = document.getElementById('progress');
+        const questionText = document.getElementById('question-text');
+        const answerBox = document.getElementById('answer-box');
+        const numberBox = document.getElementById('number-box');
+        const quizStatus = document.getElementById('quiz-status');
+        const questionCard = document.querySelector('.question-card');
+        const previousButton = document.getElementById('previous-question');
+        const hardButton = document.getElementById('mark-hard');
+        const showAnswerButton = document.getElementById('show-answer');
+        const showNumberButton = document.getElementById('show-number');
+        const nextButton = document.getElementById('next-question');
+        const changeSetButton = document.getElementById('change-set');
+
+        async function loadCSV(file) {
+            const response = await fetch(file, { cache: 'no-store' });
+            if (!response.ok) throw new Error('CSV datoteka nije pronađena.');
+            const data = await response.text();
+
+            return data.split(/\r?\n/).slice(1)
+                .map(row => row.split(';').map(cell => cell.trim()))
+                .filter(columns => columns.length >= 4 && columns[0])
+                .map(([Rbr, Tekst, Odgovor, Tezina]) => ({
+                    Rbr: parseInt(Rbr, 10),
+                    Tekst,
+                    Odgovor,
+                    Tezina: parseInt(Tezina, 10)
+                }))
+                .filter(q => Number.isFinite(q.Rbr) && q.Tekst);
+        }
+
+        function getQuestionsForActiveSet() {
+            if (!activeSet) return [];
+            return allQuestions.filter(q =>
+                q.Rbr >= activeSet.min &&
+                q.Rbr <= activeSet.max &&
+                (!hardOnlyEnabled || hardQuestions.has(q.Rbr))
+            );
+        }
+
+        function getHardCountForSet(set) {
+            if (!set) return hardQuestions.size;
+            return Array.from(hardQuestions).filter(rbr => rbr >= set.min && rbr <= set.max).length;
+        }
+
+        function updateHardOnlyLabel() {
+            const count = activeSet ? getHardCountForSet(activeSet) : hardQuestions.size;
+            hardOnlyLabel.textContent = `Samo teška pitanja (${count})`;
+        }
+
+        function loadHardQuestions() {
+            try {
+                const raw = localStorage.getItem(HARD_QUESTIONS_KEY);
+                if (!raw) return;
+                hardQuestions = new Set(JSON.parse(raw).map(Number).filter(Number.isFinite));
+            } catch (error) {
+                localStorage.removeItem(HARD_QUESTIONS_KEY);
+                hardQuestions = new Set();
+            }
+        }
+
+        function saveHardQuestions() {
+            localStorage.setItem(HARD_QUESTIONS_KEY, JSON.stringify(Array.from(hardQuestions)));
+            updateHardOnlyLabel();
+        }
+
+        function saveProgress() {
+            if (!activeSet) {
+                localStorage.removeItem(STORAGE_KEY);
+                return;
+            }
+
+            const progressData = {
+                activeSetId: activeSet.id,
+                playedQuestions: Array.from(playedQuestions),
+                history,
+                currentIndex,
+                hardOnlyEnabled,
+                savedAt: Date.now()
+            };
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
+        }
+
+        function loadSavedProgress() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (error) {
+                localStorage.removeItem(STORAGE_KEY);
+                return null;
+            }
+        }
+
+        function clearProgress() {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+
+        function loadSettings() {
+            try {
+                const raw = localStorage.getItem(SETTINGS_KEY);
+                if (!raw) return;
+                const settings = JSON.parse(raw);
+                animationsEnabled = Boolean(settings.animationsEnabled);
+                hardOnlyEnabled = Boolean(settings.hardOnlyEnabled);
+                animationsToggle.checked = animationsEnabled;
+                hardOnlyToggle.checked = hardOnlyEnabled;
+            } catch (error) {
+                localStorage.removeItem(SETTINGS_KEY);
+                animationsEnabled = false;
+                hardOnlyEnabled = false;
+                animationsToggle.checked = false;
+                hardOnlyToggle.checked = false;
+            }
+        }
+
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({ animationsEnabled, hardOnlyEnabled }));
+        }
+
+        function getRandomQuestion() {
+            const availableQuestions = getQuestionsForActiveSet()
+                .filter(q => !playedQuestions.has(q.Rbr));
+
+            if (availableQuestions.length === 0) return null;
+
+            const randomIndex = Math.floor(Math.random() * availableQuestions.length);
+            const question = availableQuestions[randomIndex];
+            playedQuestions.add(question.Rbr);
+            return question;
+        }
+
+        function showScreen(screen) {
+            setScreen.classList.toggle('active', screen === 'set');
+            quizScreen.classList.toggle('active', screen === 'quiz');
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+
+        function resetRevealState() {
+            answerVisible = false;
+            numberVisible = false;
+            answerBox.textContent = '';
+            numberBox.textContent = '';
+            answerBox.classList.remove('visible');
+            numberBox.classList.remove('visible');
+            showAnswerButton.disabled = false;
+            showNumberButton.disabled = false;
+        }
+
+        function syncFromHistoryEntry() {
+            const entry = history[currentIndex];
+            if (!entry) {
+                currentQuestion = null;
+                answerVisible = false;
+                numberVisible = false;
+                return;
+            }
+
+            currentQuestion = allQuestions.find(q => q.Rbr === Number(entry.rbr)) || null;
+            answerVisible = Boolean(entry.answerVisible);
+            numberVisible = Boolean(entry.numberVisible);
+        }
+
+        function syncCurrentEntry() {
+            if (currentIndex < 0 || !history[currentIndex]) return;
+            history[currentIndex].answerVisible = answerVisible;
+            history[currentIndex].numberVisible = numberVisible;
+        }
+
+        function applyRevealState() {
+            if (!currentQuestion) return;
+
+            answerBox.textContent = answerVisible ? `Odgovor: ${currentQuestion.Odgovor}` : '';
+            numberBox.textContent = numberVisible ? `Broj pitanja: ${currentQuestion.Rbr}` : '';
+            answerBox.classList.toggle('visible', answerVisible);
+            numberBox.classList.toggle('visible', numberVisible);
+            showAnswerButton.disabled = answerVisible;
+            showNumberButton.disabled = numberVisible;
+            const isHard = hardQuestions.has(currentQuestion.Rbr);
+            hardButton.classList.toggle('active', isHard);
+            hardButton.setAttribute('aria-pressed', String(isHard));
+            hardButton.title = isHard ? 'Makni oznaku teško' : 'Označi kao teško';
+        }
+
+        function renderEndOfSet() {
+            const total = getQuestionsForActiveSet().length;
+            currentQuestion = null;
+            answerVisible = false;
+            numberVisible = false;
+            answerBox.textContent = '';
+            numberBox.textContent = '';
+            answerBox.classList.remove('visible');
+            numberBox.classList.remove('visible');
+            if (hardOnlyEnabled && total === 0) {
+                questionText.textContent = `Nema teških pitanja u Setu ${activeSet.id}.`;
+                quizStatus.textContent = 'Označi neka pitanja zvjezdicom ili isključi “Samo teška pitanja”.';
+            } else {
+                questionText.textContent = `Gotovo — završio/la si svih ${total} pitanja u Setu ${activeSet.id}.`;
+                quizStatus.textContent = 'Možeš krenuti ispočetka ili odabrati drugi set.';
+            }
+            progress.textContent = '';
+            previousButton.disabled = history.length === 0;
+            hardButton.disabled = true;
+            hardButton.classList.remove('active');
+            showAnswerButton.disabled = true;
+            showNumberButton.disabled = true;
+            nextButton.textContent = 'Kreni ispočetka';
+            nextButton.onclick = () => startSet(activeSet, true);
+            saveProgress();
+        }
+
+        function renderCurrentQuestion() {
+            syncFromHistoryEntry();
+
+            if (!currentQuestion) {
+                renderEndOfSet();
+                return;
+            }
+
+            const total = getQuestionsForActiveSet().length;
+            progress.textContent = hardOnlyEnabled
+                ? `Teško pitanje ${currentIndex + 1} od ${total}`
+                : `Pitanje ${currentIndex + 1} od ${total}`;
+            questionText.textContent = currentQuestion.Tekst;
+            quizStatus.textContent = '';
+            previousButton.disabled = currentIndex <= 0;
+            hardButton.disabled = false;
+            nextButton.textContent = 'Dalje';
+            nextButton.onclick = goNext;
+            applyRevealState();
+            saveProgress();
+        }
+
+        function appendRandomQuestion() {
+            const question = getRandomQuestion();
+            if (!question) return false;
+
+            history.push({
+                rbr: question.Rbr,
+                answerVisible: false,
+                numberVisible: false
+            });
+            currentIndex = history.length - 1;
+            return true;
+        }
+
+        function performNext() {
+            if (currentIndex < history.length - 1) {
+                currentIndex += 1;
+                renderCurrentQuestion();
+                return;
+            }
+
+            if (!appendRandomQuestion()) {
+                renderEndOfSet();
+                return;
+            }
+
+            renderCurrentQuestion();
+        }
+
+        function performPrevious() {
+            if (currentIndex <= 0) return;
+            currentIndex -= 1;
+            renderCurrentQuestion();
+        }
+
+        function resetCardPosition() {
+            questionCard.classList.remove('dragging');
+            questionCard.style.transform = '';
+            questionCard.style.opacity = '';
+        }
+
+        function snapCardBack() {
+            if (isAnimating) return;
+            questionCard.classList.remove('dragging');
+            questionCard.style.transform = 'translateX(0)';
+            questionCard.style.opacity = '1';
+            window.setTimeout(resetCardPosition, ANIMATION_MS);
+        }
+
+        function animateNavigation(direction, navigationFn) {
+            if (isAnimating) return;
+
+            if (!animationsEnabled) {
+                resetCardPosition();
+                navigationFn();
+                return;
+            }
+
+            isAnimating = true;
+
+            const exitX = direction === 'next' ? '-105%' : '105%';
+            const enterX = direction === 'next' ? '105%' : '-105%';
+
+            questionCard.classList.remove('dragging');
+            questionCard.style.transform = `translateX(${exitX})`;
+            questionCard.style.opacity = '0';
+
+            window.setTimeout(() => {
+                navigationFn();
+                questionCard.classList.add('dragging');
+                questionCard.style.transform = `translateX(${enterX})`;
+                questionCard.style.opacity = '0';
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        questionCard.classList.remove('dragging');
+                        questionCard.style.transform = 'translateX(0)';
+                        questionCard.style.opacity = '1';
+
+                        window.setTimeout(() => {
+                            resetCardPosition();
+                            isAnimating = false;
+                        }, ANIMATION_MS);
+                    });
+                });
+            }, ANIMATION_MS);
+        }
+
+        function goNext() {
+            if (nextButton.disabled || isAnimating) return;
+            animateNavigation('next', performNext);
+        }
+
+        function goPrevious() {
+            if (previousButton.disabled || isAnimating) return;
+            animateNavigation('previous', performPrevious);
+        }
+
+        function startSet(set, resetSavedProgress = true) {
+            activeSet = set;
+            playedQuestions = new Set();
+            history = [];
+            currentIndex = -1;
+            currentQuestion = null;
+            answerVisible = false;
+            numberVisible = false;
+            setLabel.textContent = hardOnlyEnabled
+                ? `Set ${set.id} (${set.min}-${set.max}) · samo teška`
+                : `Set ${set.id} (${set.min}-${set.max})`;
+            updateHardOnlyLabel();
+            showScreen('quiz');
+            if (resetSavedProgress) clearProgress();
+            performNext();
+        }
+
+        function restoreProgress(saved) {
+            if (!saved || !saved.activeSetId) return false;
+
+            const set = SETS.find(item => item.id === saved.activeSetId);
+            if (!set) return false;
+
+            activeSet = set;
+            history = Array.isArray(saved.history) ? saved.history
+                .filter(entry => entry && Number.isFinite(Number(entry.rbr)))
+                .map(entry => ({
+                    rbr: Number(entry.rbr),
+                    answerVisible: Boolean(entry.answerVisible),
+                    numberVisible: Boolean(entry.numberVisible)
+                })) : [];
+
+            playedQuestions = new Set(history.map(entry => entry.rbr));
+            if (Array.isArray(saved.playedQuestions)) {
+                saved.playedQuestions.map(Number).filter(Number.isFinite).forEach(rbr => playedQuestions.add(rbr));
+            }
+
+            currentIndex = Number.isFinite(Number(saved.currentIndex)) ? Number(saved.currentIndex) : history.length - 1;
+            if (currentIndex >= history.length) currentIndex = history.length - 1;
+            if (currentIndex < -1) currentIndex = -1;
+
+            setLabel.textContent = hardOnlyEnabled
+                ? `Set ${set.id} (${set.min}-${set.max}) · samo teška`
+                : `Set ${set.id} (${set.min}-${set.max})`;
+            updateHardOnlyLabel();
+            showScreen('quiz');
+
+            if (history.length > 0 && currentIndex >= 0) {
+                renderCurrentQuestion();
+            } else {
+                performNext();
+            }
+
+            quizStatus.textContent = 'Nastavljeno od zadnjeg spremljenog mjesta.';
+            return true;
+        }
+
+
+        function isQuizActive() {
+            return quizScreen.classList.contains('active');
+        }
+
+        function isTypingOrButtonTarget(target) {
+            if (!target) return false;
+            const tagName = target.tagName ? target.tagName.toLowerCase() : '';
+            return ['input', 'textarea', 'select', 'button', 'a'].includes(tagName) || Boolean(target.closest?.('button, a'));
+        }
+
+        function handleKeyboardNavigation(event) {
+            if (!isQuizActive() || isTypingOrButtonTarget(event.target)) return;
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                if (!previousButton.disabled) goPrevious();
+            }
+
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                if (!nextButton.disabled) nextButton.click();
+            }
+        }
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchCurrentX = 0;
+        let touchStartedOnControl = false;
+        let isDraggingCard = false;
+
+        function handleTouchStart(event) {
+            if (!isQuizActive() || event.touches.length !== 1 || isAnimating) return;
+
+            touchStartedOnControl = isTypingOrButtonTarget(event.target);
+            touchStartX = event.touches[0].clientX;
+            touchStartY = event.touches[0].clientY;
+            touchCurrentX = touchStartX;
+            isDraggingCard = false;
+        }
+
+        function handleTouchMove(event) {
+            if (!isQuizActive() || touchStartedOnControl || event.touches.length !== 1 || isAnimating) return;
+
+            touchCurrentX = event.touches[0].clientX;
+            const touchCurrentY = event.touches[0].clientY;
+            const deltaX = touchCurrentX - touchStartX;
+            const deltaY = touchCurrentY - touchStartY;
+
+            if (!isDraggingCard) {
+                if (Math.abs(deltaX) < 12) return;
+                if (Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+                isDraggingCard = true;
+                if (animationsEnabled) questionCard.classList.add('dragging');
+            }
+
+            event.preventDefault();
+
+            if (!animationsEnabled) return;
+
+            const limitedDelta = Math.max(-SWIPE_DRAG_LIMIT, Math.min(SWIPE_DRAG_LIMIT, deltaX));
+            const opacity = Math.max(0.65, 1 - Math.abs(limitedDelta) / 360);
+            questionCard.style.transform = `translateX(${limitedDelta}px) rotate(${limitedDelta / 36}deg)`;
+            questionCard.style.opacity = String(opacity);
+        }
+
+        function handleTouchEnd(event) {
+            if (!isQuizActive() || touchStartedOnControl || event.changedTouches.length !== 1 || isAnimating) return;
+
+            const touchEndX = event.changedTouches[0].clientX;
+            const touchEndY = event.changedTouches[0].clientY;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            isDraggingCard = false;
+
+            if (Math.abs(deltaX) < SWIPE_MIN_DISTANCE ||
+                Math.abs(deltaY) > SWIPE_MAX_VERTICAL_DRIFT ||
+                Math.abs(deltaX) < Math.abs(deltaY) * 1.25) {
+                if (animationsEnabled) snapCardBack();
+                else resetCardPosition();
+                return;
+            }
+
+            if (deltaX > 0 && !previousButton.disabled) {
+                animateNavigation('previous', performPrevious);
+            } else if (deltaX < 0 && !nextButton.disabled) {
+                animateNavigation('next', performNext);
+            } else {
+                if (animationsEnabled) snapCardBack();
+                else resetCardPosition();
+            }
+        }
+
+        function renderSetButtons() {
+            setGrid.innerHTML = '';
+
+            SETS.forEach(set => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'set-button';
+                button.innerHTML = `<strong>Set ${set.id}</strong><span>${set.min}-${set.max}</span>`;
+                button.onclick = () => startSet(set);
+                setGrid.appendChild(button);
+            });
+        }
+
+        previousButton.onclick = goPrevious;
+        document.addEventListener('keydown', handleKeyboardNavigation);
+        document.addEventListener('touchstart', handleTouchStart, { passive: true });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd, { passive: true });
+        document.addEventListener('touchcancel', snapCardBack, { passive: true });
+
+        showAnswerButton.onclick = () => {
+            if (!currentQuestion) return;
+            answerVisible = true;
+            syncCurrentEntry();
+            applyRevealState();
+            saveProgress();
+        };
+
+        showNumberButton.onclick = () => {
+            if (!currentQuestion) return;
+            numberVisible = true;
+            syncCurrentEntry();
+            applyRevealState();
+            saveProgress();
+        };
+
+        hardButton.onclick = () => {
+            if (!currentQuestion) return;
+            if (hardQuestions.has(currentQuestion.Rbr)) {
+                hardQuestions.delete(currentQuestion.Rbr);
+            } else {
+                hardQuestions.add(currentQuestion.Rbr);
+            }
+            saveHardQuestions();
+            applyRevealState();
+        };
+
+        changeSetButton.onclick = () => {
+            showScreen('set');
+            quizStatus.textContent = '';
+        };
+
+        animationsToggle.addEventListener('change', () => {
+            animationsEnabled = animationsToggle.checked;
+            saveSettings();
+            resetCardPosition();
+        });
+
+        hardOnlyToggle.addEventListener('change', () => {
+            hardOnlyEnabled = hardOnlyToggle.checked;
+            saveSettings();
+            clearProgress();
+            updateHardOnlyLabel();
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            loadHardQuestions();
+            loadSettings();
+            updateHardOnlyLabel();
+            renderSetButtons();
+
+            try {
+                allQuestions = await loadCSV('pubquizFinal.csv');
+                loadStatus.textContent = `Učitano ${allQuestions.length} pitanja.`;
+
+                const saved = loadSavedProgress();
+                if (saved) {
+                    const restored = restoreProgress(saved);
+                    if (!restored) clearProgress();
+                }
+            } catch (error) {
+                loadStatus.textContent = error.message || 'Greška pri učitavanju pitanja.';
+                loadStatus.classList.add('error');
+                setGrid.querySelectorAll('button').forEach(button => button.disabled = true);
+            }
+        });
+    </script>
+</body>
+</html>

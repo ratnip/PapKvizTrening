@@ -927,7 +927,7 @@
             renderSetButtons();
 
             try {
-                allQuestions = await loadCSV('pubquiz2.csv');
+                allQuestions = await loadCSV('pubquizFinal.csv');
                 loadStatus.textContent = `Učitano ${allQuestions.length} pitanja.`;
 
                 const saved = loadSavedProgress();

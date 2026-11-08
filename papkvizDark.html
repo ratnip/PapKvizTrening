@@ -172,7 +172,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const questions = await loadCSV('pubquiz2.csv');
+            const questions = await loadCSV('pubquizFinal.csv');
             const questionList = document.getElementById('question-list');
             const toggleButtons = document.querySelectorAll('.toggle');
             let selectedRanges = [[1, 400], [401, 800], [801, 1200], [1201, 1600], [1601, 2000], [2001, 2400]];
