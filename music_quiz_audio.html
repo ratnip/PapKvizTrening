@@ -306,7 +306,6 @@
         .audio-status { font-size:.82rem;color:var(--muted);text-align:center;margin:0;min-height:1.1rem; }
         .retry-audio { background:#444;margin-top:0;min-height:36px; }
         .actions { grid-template-columns:52px 52px minmax(0,1fr) minmax(0,1fr); }
-        .actions .decade-action { grid-column:3 / -1;background:#303030; }
         .actions #next-question { grid-column:1 / -1; }
         .song-heading { text-align:left; }
         #clip-player { display:none; }
@@ -314,7 +313,7 @@
 </head>
 <body>
 <main class="app">
-<header><h1>Music Quiz · Audio V2</h1></header>
+<header><h1>Music Quiz · Audio V3</h1></header>
 <section id="set-screen" class="screen active">
 <div class="card">
 <h2 class="selection-title">Choose your decades</h2>
@@ -347,7 +346,6 @@
 <button id="mark-hard" class="hard-button" type="button" aria-label="Mark as hard" aria-pressed="false">⭐</button>
 <button id="show-answer" type="button">Show artist</button>
 <button id="show-title" type="button">Show title</button>
-<button id="show-decade" type="button" class="decade-action">Show decade</button>
 <button id="next-question" class="next-button" type="button">Next song</button>
 </div>
 <p id="quiz-status" class="status"></p>
@@ -573,16 +571,14 @@ function entry() { return history[index]; }
 function syncReveals() {
   if(!current)return;
   const e=entry();
-  if(activeAutoDecade)e.decade=true;
   $('artist-box').textContent=e.answer?current.artist:'';
   $('title-box').textContent=e.title?current.title:'';
-  $('song-decade').textContent=e.decade?`${current.decade}s`:'';
+  $('song-decade').textContent=activeAutoDecade?`${current.decade}s`:'';
   $('artist-box').classList.toggle('visible',!!e.answer);
   $('title-box').classList.toggle('visible',!!e.title);
-  $('song-decade').hidden=!e.decade;
+  $('song-decade').hidden=!activeAutoDecade;
   $('show-answer').disabled=!!e.answer;
   $('show-title').disabled=!!e.title;
-  $('show-decade').disabled=!!e.decade;
   const hard=markedHard.has(current.id);
   $('mark-hard').classList.toggle('active',hard);
   $('mark-hard').setAttribute('aria-pressed',String(hard));
@@ -609,7 +605,7 @@ function renderEnd() {
   $('artist-box').textContent=''; $('title-box').textContent='';
   $('previous-question').disabled=history.length===0;
   $('mark-hard').disabled=true; $('mark-hard').classList.remove('active');
-  $('show-answer').disabled=true; $('show-title').disabled=true; $('show-decade').disabled=true;
+  $('show-answer').disabled=true; $('show-title').disabled=true;
   $('next-question').textContent='Start again';
   $('next-question').onclick=()=>startQuiz(true);
   statusAudio('Quiz completed');
@@ -619,7 +615,7 @@ function appendQuestion() {
   const remaining=pool().filter(s=>!played.has(s.id));
   if(!remaining.length)return false;
   const q=remaining[Math.floor(Math.random()*remaining.length)];
-  played.add(q.id); history.push({id:q.id,answer:false,title:false,decade:false}); index=history.length-1;
+  played.add(q.id); history.push({id:q.id,answer:false,title:false}); index=history.length-1;
   return true;
 }
 function doNext() {
@@ -660,7 +656,7 @@ function restoreProgress() {
   activeDecades=p.activeDecades.filter(d=>decades.includes(d));
   activeHardOnly=!!p.activeHardOnly;
   activeAutoDecade=!!p.activeAutoDecade;
-  history=p.history.filter(e=>valid.has(e.id)).map(e=>({id:e.id,answer:!!e.answer,title:!!e.title,decade:!!e.decade}));
+  history=p.history.filter(e=>valid.has(e.id)).map(e=>({id:e.id,answer:!!e.answer,title:!!e.title}));
   if(!activeDecades.length || !history.length)return;
   played=new Set(history.map(e=>e.id));
   index=Math.max(0,Math.min(Number(p.index)||0,history.length));
@@ -683,7 +679,6 @@ function maybeAutoAdvance(){
 }
 $('show-answer').onclick=()=>{if(current && !entry().answer){entry().answer=true;syncReveals();saveProgress();maybeAutoAdvance();}};
 $('show-title').onclick=()=>{if(current && !entry().title){entry().title=true;syncReveals();saveProgress();maybeAutoAdvance();}};
-$('show-decade').onclick=()=>{if(current){entry().decade=true;syncReveals();saveProgress();}};
 $('mark-hard').onclick=()=>{if(!current)return; if(markedHard.has(current.id))markedHard.delete(current.id);else markedHard.add(current.id);store(HARD,[...markedHard]);updateHardLabel();syncReveals();};
 $('animations-toggle').onchange=e=>{animations=e.target.checked;updateSelection(false);};
 $('hard-only-toggle').onchange=e=>{hardOnly=e.target.checked;updateSelection(false);};
